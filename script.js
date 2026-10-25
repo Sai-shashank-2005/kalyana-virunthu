@@ -557,6 +557,34 @@ function preload() {
 
 /* ---------- init ---------- */
 
+function initScrollReveals() {
+  const revealElements = document.querySelectorAll(".reveal");
+  if (!("IntersectionObserver" in window)) {
+    revealElements.forEach((el) => el.classList.add("is-revealed"));
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries, obs) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-revealed");
+          obs.unobserve(entry.target);
+        }
+      });
+    },
+    { rootMargin: "0px 0px -40px 0px", threshold: 0.12 },
+  );
+
+  revealElements.forEach((el) => observer.observe(el));
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initScrollReveals);
+} else {
+  initScrollReveals();
+}
+
 hydrateImages(
   "#groomhand[data-src], #bridehand[data-src], #groomhandcut[data-src]",
 );
