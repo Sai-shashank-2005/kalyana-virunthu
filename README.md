@@ -23,7 +23,7 @@ Featuring a custom scroll-driven parallax hero, warm ivory paper stationery styl
 
 ---
 
-## 🛠 Local Development
+## 🛠 Local Development & Build
 
 ```bash
 # Install dependencies
@@ -31,6 +31,21 @@ npm install
 
 # Start local development server
 npm run dev
+
+# Build for production (outputs to /dist)
+npm run build
+
+# Preview production build locally
+npm run preview
 ```
 
-Built with HTML5, CSS3, Vanilla JS, and Vite.
+---
+
+## 🎨 Features & Highlights
+
+- **Scroll-Driven Parallax Hero:** Immersive hands-clasping animation with minimal, high-legibility wedding typography.
+- **Stationery Aesthetic:** Pure letterpress styling with warm ivory (`#F8F5EE`), temple maroon (`#6A252B`), antique gold (`#B08D57`), and paper textures without digital glow halos.
+- **Bespoke Local Fonts:** High-end typography (`Cinzel`, `Cormorant Garamond`, `Pinyon Script`, `Inter`) loaded 100% locally from `/fonts/`.
+- **5-Page Interactive Wedding Sketchbook:** Paper sketchbook with nested page curls, direct dragging, and magnifying loupe in Section 08.
+- **Regal Contrast Bottom Section:** Rich deep temple maroon & antique gold closing blessing section for visual depth.
+- **Mobile-First Responsive:** Flawlessly verified across 320px, 360px, 390px, and 430px widths with 0 horizontal overflow.
