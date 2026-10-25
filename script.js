@@ -1,5 +1,5 @@
 /* ============================================================
-   Bair & Shimi — hero scroll sequence
+   Santhosh weds Priya — hero scroll sequence
    Resolution-independent: all offsets are % of the stage box or
    vmin-relative, so the composition resolves identically on
    phone / tablet / laptop / ultrawide.
@@ -89,15 +89,17 @@ const stageProgress = (v, start, end) =>
 const ease = (t) => 1 - Math.pow(1 - t, 3);
 
 function lockBody() {
-  scrollLockY = window.scrollY;
+  if (locked) return;
+  locked = true;
   document.body.classList.add("locked");
-  document.body.style.top = `-${scrollLockY}px`;
+  document.body.style.top = "0px";
 }
 
 function unlockBody() {
+  if (!locked) return;
+  locked = false;
   document.body.classList.remove("locked");
   document.body.style.top = "";
-  window.scrollTo(0, scrollLockY);
 }
 
 /* ---------- main render ---------- */
@@ -198,6 +200,9 @@ function requestRender() {
 function advance(delta) {
   virtualScroll = clamp(virtualScroll + delta, 0, TOTAL_SCROLL);
   requestRender();
+  if (virtualScroll >= TOTAL_SCROLL && delta > 0) {
+    unlockBody();
+  }
 }
 
 /* ---------- auto-scroll (plays once, any input cancels) ---------- */
@@ -282,11 +287,14 @@ window.addEventListener(
   (e) => {
     cancelAuto();
     if (locked) {
+      if (virtualScroll >= TOTAL_SCROLL && e.deltaY > 0) {
+        unlockBody();
+        return;
+      }
       e.preventDefault();
       advance(e.deltaY);
     } else if (window.scrollY <= 0 && e.deltaY < 0) {
       e.preventDefault();
-      locked = true;
       lockBody();
       advance(e.deltaY);
     }
@@ -317,11 +325,14 @@ window.addEventListener(
     lastTouchY = y;
 
     if (locked) {
+      if (virtualScroll >= TOTAL_SCROLL && delta > 0) {
+        unlockBody();
+        return;
+      }
       e.preventDefault();
       advance(delta);
     } else if (window.scrollY <= 0 && delta < 0) {
       e.preventDefault();
-      locked = true;
       lockBody();
       advance(delta);
     }
@@ -335,7 +346,12 @@ window.addEventListener(
   "keydown",
   (e) => {
     cancelAuto();
-    if (!locked) return;
+    if (!locked) {
+      if (window.scrollY <= 0 && ["ArrowUp", "PageUp", "Home"].includes(e.key)) {
+        lockBody();
+      }
+      return;
+    }
     const step = TOTAL_SCROLL / 12;
     if (["ArrowDown", "PageDown", " "].includes(e.key)) {
       e.preventDefault();
@@ -348,6 +364,7 @@ window.addEventListener(
     if (e.key === "End") {
       e.preventDefault();
       advance(TOTAL_SCROLL);
+      unlockBody();
     }
     if (e.key === "Home") {
       e.preventDefault();
@@ -356,6 +373,18 @@ window.addEventListener(
   },
   { passive: false },
 );
+
+if (scrollCue) {
+  scrollCue.style.cursor = "pointer";
+  scrollCue.addEventListener("click", () => {
+    cancelAuto();
+    virtualScroll = TOTAL_SCROLL;
+    render();
+    unlockBody();
+    const nextSec = document.getElementById("auspicious");
+    if (nextSec) nextSec.scrollIntoView({ behavior: "smooth" });
+  });
+}
 
 /* ---------- resize / orientation ---------- */
 
