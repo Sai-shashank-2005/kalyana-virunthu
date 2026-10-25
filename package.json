@@ -1,7 +1,7 @@
 {
-  "name": "wedding-invitation-parallax",
+  "name": "kalyana-virunthu",
   "version": "1.0.0",
-  "description": "Wedding Invitation Parallax - Santhosh weds Priya",
+  "description": "Kalyana Virunthu — Wedding Invitation Website for Santhosh Ananth & Shunmugapriya",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

@@ -46,6 +46,20 @@ npm run preview
 - **Scroll-Driven Parallax Hero:** Immersive hands-clasping animation with minimal, high-legibility wedding typography.
 - **Stationery Aesthetic:** Pure letterpress styling with warm ivory (`#F8F5EE`), temple maroon (`#6A252B`), antique gold (`#B08D57`), and paper textures without digital glow halos.
 - **Bespoke Local Fonts:** High-end typography (`Cinzel`, `Cormorant Garamond`, `Pinyon Script`, `Inter`) loaded 100% locally from `/fonts/`.
-- **5-Page Interactive Wedding Sketchbook:** Paper sketchbook with nested page curls, direct dragging, and magnifying loupe in Section 08.
+- **5-Page Interactive "Our Beautiful Moments" Sketchbook:** Paper memory sketchbook featuring candid couple photographs, heartfelt chapter notes, nested 3D page curls, direct dragging, and magnifying loupe in Section 08.
 - **Regal Contrast Bottom Section:** Rich deep temple maroon & antique gold closing blessing section for visual depth.
 - **Mobile-First Responsive:** Flawlessly verified across 320px, 360px, 390px, and 430px widths with 0 horizontal overflow.
+
+---
+
+## 🚀 Deployment (Vercel)
+
+This repository is optimized for one-click deployment on [Vercel](https://vercel.com):
+1. Push this repository to GitHub:
+   ```bash
+   git push origin main
+   ```
+2. In Vercel, import the `kalyana-virunthu` repository.
+3. Framework Preset: **Vite** (auto-detected via `vercel.json`).
+4. Output Directory: **`dist`** (auto-detected).
+5. Click **Deploy**!

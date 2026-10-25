@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wedding Memory Sketchbook | Santhosh Ananth &amp; Shunmugapriya</title>
-<meta name="description" content="Interactive 5-page wedding memory sketchbook celebrating Santhosh Ananth &amp; Shunmugapriya">
+<title>Our Beautiful Moments | Santhosh Ananth &amp; Shunmugapriya</title>
+<meta name="description" content="A candid collection of beautiful casual moments and memories of Santhosh Ananth &amp; Shunmugapriya">
 <style>
 @font-face{font-family:'Instrument Serif';font-style:normal;font-weight:400;font-display:block;
-  src:url(/sketchbook/instrument-serif.woff2) format('woff2')}
+  src:url(./instrument-serif.woff2) format('woff2')}
 @font-face{font-family:'Instrument Serif';font-style:italic;font-weight:400;font-display:block;
-  src:url(/sketchbook/instrument-serif-italic.woff2) format('woff2')}
+  src:url(./instrument-serif-italic.woff2) format('woff2')}
 @font-face{font-family:'Newsreader';font-style:normal;font-weight:200 600;font-display:swap;
-  src:url(/sketchbook/newsreader.woff2) format('woff2')}
+  src:url(./newsreader.woff2) format('woff2')}
 
 :root{
   --paper:#ece7dc;
@@ -39,7 +39,7 @@ button{font:inherit}
 /* the painted ground the whole page sits on */
 .wash{
   position:fixed;inset:0;z-index:-2;pointer-events:none;
-  background:url(/sketchbook/bg-wash.jpg) center top / cover no-repeat;
+  background:url(./bg-wash.jpg) center top / cover no-repeat;
   opacity:.85;
 }
 .wash:after{
@@ -381,7 +381,7 @@ button{font:inherit}
 .rule{
   display:block;width:min(1080px,86vw);margin:clamp(30px,6vh,64px) auto;
   height:clamp(26px,4vw,46px);
-  background:url(/sketchbook/divider.png) center / 100% auto no-repeat;
+  background:url(./divider.png) center / 100% auto no-repeat;
   opacity:.5;
 }
 .rule.short{width:min(420px,52vw);opacity:.4}
@@ -459,10 +459,10 @@ body>.wash{display:block}
   </header>
 
   <section id="sketchbook" class="hero">
-    <img class="botany l" src="/sketchbook/botany-left.png" alt="" aria-hidden="true">
-    <img class="botany r" src="/sketchbook/botany-right.png" alt="" aria-hidden="true">
+    <img class="botany l" src="./botany-left.png" alt="" aria-hidden="true">
+    <img class="botany r" src="./botany-right.png" alt="" aria-hidden="true">
 
-    <p class="hero-kicker">Designer / Creator / AI Educator / Founder @ Singapore</p>
+    <p class="hero-kicker">Beautiful Moments · Santhosh Ananth &amp; Shunmugapriya</p>
 
     <div class="sb-wrap" id="sbWrap">
       <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -510,33 +510,28 @@ body>.wash{display:block}
 
   <section id="about" class="about">
     <div>
-      <p class="section-label">About</p>
-      <p class="bio">Meng To is a designer and teacher in Singapore. He founded <a class="bio-link" href="https://designcode.io" target="_blank" rel="noopener">Design+Code</a>, where he teaches designers code and developers design, and builds <a class="bio-link" href="https://aura.build" target="_blank" rel="noopener">Aura</a> and <a class="bio-link" href="https://dreamcut.ai" target="_blank" rel="noopener">DreamCut</a>.</p>
-      <p class="bio">This sketchbook is the slower half of that. The city looked at properly, in ink and a little colour: shophouse shutters, hawker tents, the bay at dusk.</p>
+      <p class="section-label">Our Story</p>
+      <p class="bio">Santhosh Ananth and Shunmugapriya. From casual coffee conversations and spontaneous laughter to a promise of forever, these moments capture the simple joy of our everyday love.</p>
+      <p class="bio">Every photograph holds a shared smile, a quiet memory, and a reminder that the best days are simply the ones spent together.</p>
     </div>
-    <img class="bloom" src="/sketchbook/bloom.png" alt="" aria-hidden="true">
+    <img class="bloom" src="./bloom.png" alt="" aria-hidden="true">
   </section>
 
   <div class="rule short" aria-hidden="true"></div>
 
   <section id="plates" class="plates">
-    <p class="section-label">Plates</p>
+    <p class="section-label">Moments</p>
     <ol class="plate-list" id="plateList"></ol>
   </section>
 
   <div class="rule short" aria-hidden="true"></div>
 
   <section id="contact" class="contact">
-    <p class="section-label">Contact</p>
-    <p class="bio">Write to me at <a class="bio-link" href="mailto:meng@designcode.io">meng@designcode.io</a>. I read everything, and I answer most of it.</p>
-    <p class="contact-social">
-      <a class="bio-link" href="https://x.com/MengTo" target="_blank" rel="me noopener">X</a>
-      <a class="bio-link" href="https://www.linkedin.com/in/mengto" target="_blank" rel="me noopener">LinkedIn</a>
-      <a class="bio-link" href="https://www.instagram.com/mengto" target="_blank" rel="me noopener">Instagram</a>
-    </p>
+    <p class="section-label">Wedding Celebrations</p>
+    <p class="bio">Join us on Wednesday, 11 November 2026 at Palani Andavar Mahal, Nilakottai for the Muhurtham, and Monday, 16 November 2026 at Thangam Residency, Tirunelveli for the Reception.</p>
   </section>
 
-  <p class="foot">Singapore · Sketchbook</p>
+  <p class="foot">Santhosh Ananth &amp; Shunmugapriya · November 2026</p>
 </main>
 
 <script>
@@ -548,13 +543,13 @@ body>.wash{display:block}
    the way paper bends instead of pivoting like a flat door.
    ===================================================================== */
 const Q=new URLSearchParams(location.search);
-const DIR='/sketchbook/';
+const DIR='./';
 const PAGES=[
-  {file:'botanic-gardens.png',   title:'The Sacred Union',            place:'Santhosh & Shunmugapriya'},
-  {file:'buddha-tooth.png',       title:'Nichayathartham & Garlands',  place:'Auspicious Engagement'},
-  {file:'gardens-by-the-bay.png', title:'Haldi & Sacred Turmeric',     place:'Joyous Celebrations'},
-  {file:'marina-bay-sands.png',   title:'The Sacred Muhurtham',        place:'Palani Andavar Mahal, Nilakottai'},
-  {file:'merlion.png',            title:'Grand Wedding Reception',     place:'Thangam Residency, Tirunelveli'}
+  {file:'plate-1.png', title:'Sunlit Smiles',            place:'The Simple Joy of Being Us'},
+  {file:'plate-2.png', title:'Laughter in Little Things', place:'Unfiltered & Full of Happiness'},
+  {file:'plate-3.png', title:'Hand in Hand',             place:'Sweet Everyday Journey'},
+  {file:'plate-4.png', title:'Sweet Adventures',         place:'Walking Through Life Together'},
+  {file:'plate-5.png', title:'Forever & Always',         place:'Santhosh & Shunmugapriya'}
 ];
 PAGES.forEach(p=>p.url=DIR+p.file);
 const M=PAGES.length, LAND=0;
