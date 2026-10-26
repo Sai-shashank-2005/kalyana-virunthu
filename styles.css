@@ -500,7 +500,8 @@ body:not(.decorative-ready) .all-text { opacity: 0 !important; }
 }
 
 .family-divider-icon svg,
-.tradition-icon-wrap svg {
+.tradition-icon-wrap svg,
+.tradition-emoji {
   animation: gentleIconBreathe 3.5s ease-in-out infinite;
 }
 
@@ -1039,8 +1040,8 @@ body:not(.decorative-ready) .all-text { opacity: 0 !important; }
 }
 
 .tradition-icon-wrap {
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   margin: 0 auto 14px;
   border-radius: 50%;
   background: var(--color-ivory);
@@ -1048,7 +1049,15 @@ body:not(.decorative-ready) .all-text { opacity: 0 !important; }
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-antique-gold);
+  font-size: 1.7rem;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(176, 141, 87, 0.12);
+}
+
+.tradition-emoji {
+  display: inline-block;
+  transform: translateY(-1px);
+  filter: drop-shadow(0 2px 4px rgba(50, 40, 30, 0.1));
 }
 
 .tradition-name {
