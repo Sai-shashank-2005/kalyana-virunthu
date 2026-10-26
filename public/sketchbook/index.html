@@ -124,11 +124,11 @@ button{font:inherit}
   touch-action:pan-y;
 }
 .sb-arrow{
-  flex:none;display:inline-flex;align-items:center;justify-content:center;padding:6px 2px;
-  border:0;background:transparent;color:var(--ink-faint);cursor:pointer;transition:color .2s;
-  -webkit-tap-highlight-color:transparent;z-index:8;
+  flex:none;display:inline-flex;align-items:center;justify-content:center;padding:10px 8px;
+  border:0;background:transparent;color:var(--ink-faint);cursor:pointer;transition:color .2s, transform .2s;
+  -webkit-tap-highlight-color:transparent;z-index:70;
 }
-.sb-arrow:hover{color:var(--ink)}
+.sb-arrow:hover{color:var(--ink);transform:scale(1.15)}
 
 /* The box is the book's own untransformed frame: the loupe lives here, on
    the desk, while only .sb-tilt leans and scales underneath it. */
@@ -493,9 +493,9 @@ body>.wash{display:block}
         <span class="zoom-read" id="zRead">100%</span>
         <button class="tool" id="zIn" aria-label="zoom in"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.6" cy="8.6" r="5.6"/><path d="M12.8 12.8 17.4 17.4M6.2 8.6h4.8M8.6 6.2v4.8"/></svg></button>
         <span class="tool-sep" aria-hidden="true"></span>
-        <button class="tool" id="loupeBtn" aria-label="magnifier" aria-pressed="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.8" cy="8.8" r="5.8"/><path d="M13 13l4.4 4.4"/><path d="M6.4 7.2a3.2 3.2 0 0 1 2.4-1.4" opacity=".55"/></svg></button>
+        <button class="tool" id="loupeBtn" aria-label="magnifier" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.8" cy="8.8" r="5.8"/><path d="M13 13l4.4 4.4"/><path d="M6.4 7.2a3.2 3.2 0 0 1 2.4-1.4" opacity=".55"/></svg></button>
       </div>
-      <p class="sb-hint" id="sbHint">Drag the page to turn · Drag the glass across it</p>
+      <p class="sb-hint" id="sbHint">Click or drag page to turn</p>
     </div>
 
     <button class="hero-down" id="heroDown" aria-label="scroll to about">
@@ -648,6 +648,16 @@ function paint(){
   }
   const a=el('button','sb-zone sb-prev'),b=el('button','sb-zone sb-next');
   a.setAttribute('aria-label','previous page');b.setAttribute('aria-label','next page');
+  a.onclick=(e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    if(!isBusy && turn===null) step('prev');
+  };
+  b.onclick=(e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    if(!isBusy && turn===null) step('next');
+  };
   book.appendChild(a);book.appendChild(b);
   layout();
   caption();
@@ -780,18 +790,19 @@ function bookRect(){return book.getBoundingClientRect()}
 function hideHint(){hint.classList.add('gone')}
 
 stage.addEventListener('pointerdown',e=>{
-  if(e.button!==0||isBusy)return;
+  if(e.button!==0||isBusy||turn!==null)return;
   const onBook=e.target.closest('.sb-zone');
   if(!onBook||introOn)return;
   e.preventDefault();                     /* no text selection, no image drag */
   e.stopPropagation();
-  stage.setPointerCapture(e.pointerId);
+  try{stage.setPointerCapture(e.pointerId);}catch(_){}
   hideHint();
   const r=bookRect();
-  const dir=(e.clientX-r.left)/r.width>0.5?'next':'prev';
+  const isRight = onBook.classList.contains('sb-next') || (!onBook.classList.contains('sb-prev') && (e.clientX-r.left)/r.width>0.5);
+  const dir=isRight?'next':'prev';
   isBusy=true;
   startTurn(dir,0);
-  drag={dir:dir,x0:e.clientX,w:r.width,moved:0,vel:0,tPrev:performance.now()};
+  drag={dir:dir,x0:e.clientX,w:r.width||stage.clientWidth,moved:0,vel:0,tPrev:performance.now(),downTime:performance.now()};
 });
 stage.addEventListener('pointermove',e=>{
   if(!drag)return;
@@ -808,11 +819,14 @@ function endDrag(e){
   if(!drag)return;
   const d=drag;drag=null;
   if(!turn){isBusy=false;return;}
-  if(d.moved<8){                              /* a tap, not a drag: turn exactly 1 page */
-    commit();return;
+  const dt = performance.now() - (d.downTime || 0);
+  // Tap or click: short duration (< 450ms) or small movement (< 35px)
+  if(d.moved < 35 || dt < 450){
+    commit();
+    return;
   }
-  const go = turn.t>0.35 || d.vel>0.8;
-  if(go)commit(); else cancel();
+  const go = turn.t > 0.20 || d.vel > 0.5;
+  if(go) commit(); else cancel();
 }
 stage.addEventListener('dragstart',e=>e.preventDefault());
 stage.addEventListener('selectstart',e=>e.preventDefault());
@@ -850,22 +864,21 @@ function cancel(){
   kick();
 }
 function step(dir){
-  if(isBusy)return;
+  if(isBusy||turn!==null)return;
   if(introOn)endIntro();
   isBusy=true;
   startTurn(dir,0);
   commit();
 }
 function goTo(i){
-  if(isBusy||i===idx)return;
+  if(isBusy||turn!==null||i===idx)return;
   if(introOn)endIntro();
-  isBusy=true;
-  if(turn){idx=turn.to;turn=null;}
   const fwd=(i-idx+M)%M, back=(idx-i+M)%M;
   if(Math.min(fwd,back)===1){
     step(fwd===1?'next':'prev');
     return;
   }
+  isBusy=true;
   idx=i;paint();
   setTimeout(()=>{isBusy=false;},100);
 }
@@ -900,7 +913,7 @@ const loupeBtn=document.getElementById('loupeBtn');
 const zInBtn=document.getElementById('zIn'), zOutBtn=document.getElementById('zOut');
 const MAG=2.3;
 const DESK=getComputedStyle(document.documentElement).getPropertyValue('--paper').trim()||'#ece7dc';
-let loupeOn=true, lx=null, ly=null, lgrab=null, lTarget=null;
+let loupeOn=false, lx=null, ly=null, lgrab=null, lTarget=null;
 
 function loupeSize(){return Math.round(Math.max(165,Math.min(262,book.clientWidth*0.235)));}
 /* the loupe's own coordinate space: stage pixels in live mode (it sits
