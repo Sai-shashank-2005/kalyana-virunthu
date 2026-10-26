@@ -569,51 +569,112 @@ const SPAN=0.449;      /* gutter → outer page edge, as a fraction     */
 const BETA=0.60;       /* peak curl of the arc, radians              */
 let idx=0, turn=null;  /* turn = {dir, from, to, t}                   */
 let strips=[];         /* the chain, kept for per-frame lighting       */
+let frontFaces=[];     /* front face elements for 0-DOM-churn updates  */
+let backFaces=[];      /* back face elements                          */
+
+// Persistent book DOM references
+let sbFull=null, sbFullImg=null;
+let sbHalfLeft=null, sbHalfLeftImg=null;
+let sbHalfRight=null, sbHalfRightImg=null;
+let curlWrap=null;
+let zonePrev=null, zoneNext=null;
 
 function el(t,c){const e=document.createElement(t);if(c)e.className=c;return e}
-function imgEl(i,side){
-  const im=new Image();im.className='sb-half-img '+side;
-  im.draggable=false;im.alt='';im.src=PAGES[i].url;return im;
-}
 
-function halfEl(pos,i){
-  const d=el('div','sb-half '+pos);
-  d.appendChild(imgEl(i,pos));
-  d.appendChild(el('div','gutter-shade '+pos));
-  return d;
-}
-/* build the strip chain once per turn; background offsets are pure
-   geometry, so they never need touching again while it animates */
-function buildCurl(dir,from,to){
+function initBookDOM(){
+  if(sbFull) return;
+  book.textContent='';
+
+  // 1. Full spread container (stationary)
+  sbFull=el('div','sb-full');
+  sbFullImg=new Image();
+  sbFullImg.draggable=false;
+  sbFullImg.alt='';
+  sbFull.appendChild(sbFullImg);
+  book.appendChild(sbFull);
+
+  // 2. Left half container (active during turn)
+  sbHalfLeft=el('div','sb-half left');
+  sbHalfLeftImg=new Image();
+  sbHalfLeftImg.className='sb-half-img left';
+  sbHalfLeftImg.draggable=false;
+  sbHalfLeftImg.alt='';
+  sbHalfLeft.appendChild(sbHalfLeftImg);
+  sbHalfLeft.appendChild(el('div','gutter-shade left'));
+  sbHalfLeft.style.display='none';
+  book.appendChild(sbHalfLeft);
+
+  // 3. Right half container (active during turn)
+  sbHalfRight=el('div','sb-half right');
+  sbHalfRightImg=new Image();
+  sbHalfRightImg.className='sb-half-img right';
+  sbHalfRightImg.draggable=false;
+  sbHalfRightImg.alt='';
+  sbHalfRight.appendChild(sbHalfRightImg);
+  sbHalfRight.appendChild(el('div','gutter-shade right'));
+  sbHalfRight.style.display='none';
+  book.appendChild(sbHalfRight);
+
+  // 4. Curl container with persistent nested strips
   strips=[];
-  const c=el('div','curl '+dir);
-  c.style.setProperty('--n',N);
-  c.style.setProperty('--span',SPAN);
-  let host=c;
+  frontFaces=[];
+  backFaces=[];
+  curlWrap=el('div','curl next');
+  curlWrap.style.setProperty('--n',N);
+  curlWrap.style.setProperty('--span',SPAN);
+  curlWrap.style.display='none';
+
+  let host=curlWrap;
   for(let i=0;i<N;i++){
     const s=el('div','strip');
     s.style.setProperty('--i',i);
-    const gut='calc(var(--bw) * 0.5)';
-    const sw='calc(var(--bw) * '+SPAN+' / '+N+')';
-    const A='calc(-1 * ('+gut+' + '+i+' * '+sw+'))';         /* faces the from-page  */
-    const B='calc('+(i+1)+' * '+sw+' - '+gut+')';            /* faces the to-page    */
     const f=el('div','face front'), b=el('div','face back');
-    const dress=(e,url,px)=>{
-      e.style.backgroundImage='url('+url+')';
-      e.style.backgroundPositionX=px;
-    };
-    dress(f,PAGES[from].url, dir==='next'?A:B);
-    dress(b,PAGES[to].url,   dir==='next'?B:A);
     f.appendChild(el('div','sh'));f.appendChild(el('div','gl'));
     b.appendChild(el('div','sh'));b.appendChild(el('div','gl'));
     s.appendChild(f);s.appendChild(b);
     if(i===N-1)s.classList.add('edge');
-    host.appendChild(s);host=s;
+    host.appendChild(s);
+    host=s;
     strips.push(s);
+    frontFaces.push(f);
+    backFaces.push(b);
   }
-  return c;
+  book.appendChild(curlWrap);
+
+  // 5. Persistent navigation hit zones
+  zonePrev=el('button','sb-zone sb-prev');
+  zonePrev.setAttribute('aria-label','previous page');
+  zonePrev.type='button';
+  zoneNext=el('button','sb-zone sb-next');
+  zoneNext.setAttribute('aria-label','next page');
+  zoneNext.type='button';
+  book.appendChild(zonePrev);
+  book.appendChild(zoneNext);
 }
+
+function updateCurl(dir,from,to){
+  curlWrap.className='curl '+dir;
+  const urlFrom=PAGES[from].url;
+  const urlTo=PAGES[to].url;
+  const gut='calc(var(--bw) * 0.5)';
+  const sw='calc(var(--bw) * '+SPAN+' / '+N+')';
+
+  for(let i=0;i<N;i++){
+    const A='calc(-1 * ('+gut+' + '+i+' * '+sw+'))';
+    const B='calc('+(i+1)+' * '+sw+' - '+gut+')';
+
+    const f=frontFaces[i];
+    f.style.backgroundImage='url('+urlFrom+')';
+    f.style.backgroundPositionX=dir==='next'?A:B;
+
+    const b=backFaces[i];
+    b.style.backgroundImage='url('+urlTo+')';
+    b.style.backgroundPositionX=dir==='next'?B:A;
+  }
+}
+
 function applyTurn(t){
+  t=Math.max(0,Math.min(1,t));               /* strictly clamp: never negative */
   const th=Math.PI*t;                       /* how far the leaf has swung */
   const beta=BETA*Math.sin(Math.PI*t);      /* it is flat at both ends    */
   const D=180/Math.PI;
@@ -631,30 +692,41 @@ function applyTurn(t){
     st.setProperty('--a2',((1-l2)*.62).toFixed(3));
   }
 }
+
 function paint(){
-  book.textContent='';
+  if(!sbFull) initBookDOM();
+
   if(!turn){
-    const f=el('div','sb-full');
-    const im=new Image();im.src=PAGES[idx].url;im.alt=PAGES[idx].title;
-    im.draggable=false;
-    f.appendChild(im);book.appendChild(f);
+    sbFullImg.src=PAGES[idx].url;
+    sbFullImg.alt=PAGES[idx].title;
+    sbFull.style.display='block';
+    sbHalfLeft.style.display='none';
+    sbHalfRight.style.display='none';
+    curlWrap.style.display='none';
     sb3d.style.setProperty('--shade','0');
   }else{
     const next=turn.dir==='next';
-    book.appendChild(halfEl('left', next?turn.from:turn.to));
-    book.appendChild(halfEl('right',next?turn.to:turn.from));
-    book.appendChild(buildCurl(turn.dir,turn.from,turn.to));
+    const leftPage=next?turn.from:turn.to;
+    const rightPage=next?turn.to:turn.from;
+
+    sbHalfLeftImg.src=PAGES[leftPage].url;
+    sbHalfRightImg.src=PAGES[rightPage].url;
+    updateCurl(turn.dir,turn.from,turn.to);
+
+    sbFull.style.display='none';
+    sbHalfLeft.style.display='block';
+    sbHalfRight.style.display='block';
+    curlWrap.style.display='block';
     applyTurn(turn.t);
   }
-  const a=el('button','sb-zone sb-prev'),b=el('button','sb-zone sb-next');
-  a.setAttribute('aria-label','previous page');b.setAttribute('aria-label','next page');
-  book.appendChild(a);book.appendChild(b);
+
   layout();
   caption();
   marks();
   if(typeof syncZoomLayer==='function')syncZoomLayer();
   if(typeof placeLoupe==='function')placeLoupe();
 }
+
 function caption(){
   capBox.textContent='';
   capOut=capIn=null;
@@ -681,15 +753,15 @@ function layout(){
 }
 addEventListener('resize',layout);
 
-/* ------------------------------------------------------ spring loop */
+/* ------------------------------------------------------ animation loop */
 let spring=null;
-function animateTo(target,onDone,stiff,damp){
-  spring={kind:'spring',v:0,target:target,done:onDone,k:stiff||150,c:damp||22};
-  kick();
+function animateTo(target,onDone){
+  const dur=Math.max(0.16,Math.abs(target-(turn?turn.t:0))*0.30);
+  tweenTo(target,dur,onDone);
 }
-/* the riffle wants a fixed tempo, not a spring settling time */
+/* fixed tempo or smooth ease-out tween */
 function tweenTo(target,dur,onDone){
-  spring={kind:'tween',from:turn?turn.t:0,target:target,dur:dur,e:0,done:onDone};
+  spring={kind:'tween',from:turn?turn.t:0,target:target,dur:Math.max(0.06,dur),e:0,done:onDone};
   kick();
 }
 let raf=null,last=0;
@@ -698,21 +770,16 @@ function tick(now){
   const dt=Math.min(0.032,(now-last)/1000||0.016);last=now;
   if(spring&&turn){
     const s=spring;
-    if(s.kind==='tween'){
-      s.e+=dt;
-      const k=Math.min(1,s.e/s.dur);
-      turn.t=s.from+(s.target-s.from)*k;
-      applyTurn(turn.t);
-      if(k>=1){spring=null;const d=s.done;d&&d();}
-    }else{
-      const x=turn.t-s.target;
-      s.v+= (-s.k*x - s.c*s.v)*dt;
-      turn.t+=s.v*dt;
-      if(Math.abs(turn.t-s.target)<0.002&&Math.abs(s.v)<0.02){
-        turn.t=s.target;spring=null;
-        applyTurn(turn.t);
-        const d=s.done;d&&d();
-      }else applyTurn(turn.t);
+    s.e+=dt;
+    const progress=Math.min(1,s.e/s.dur);
+    // Buttery cubic ease-out: responsive start, silky deceleration, no overshoot
+    const ease=1-Math.pow(1-progress,3);
+    turn.t=Math.max(0,Math.min(1,s.from+(s.target-s.from)*ease));
+    applyTurn(turn.t);
+    if(progress>=1){
+      spring=null;
+      const d=s.done;
+      d&&d();
     }
   }
   viewSpring();
@@ -775,23 +842,39 @@ stage.addEventListener('dblclick',()=>setView(view.trx,view.try_,1));
 
 /* ------------------------------------------------------- pointer work */
 let drag=null;
-let isBusy=false;
 function bookRect(){return book.getBoundingClientRect()}
 function hideHint(){hint.classList.add('gone')}
 
 stage.addEventListener('pointerdown',e=>{
-  if(e.button!==0||isBusy)return;
+  if(e.button!==0)return;
   const onBook=e.target.closest('.sb-zone');
   if(!onBook||introOn)return;
   e.preventDefault();                     /* no text selection, no image drag */
   e.stopPropagation();
-  stage.setPointerCapture(e.pointerId);
+  try{stage.setPointerCapture(e.pointerId);}catch(_){}
   hideHint();
+
   const r=bookRect();
-  const dir=(e.clientX-r.left)/r.width>0.5?'next':'prev';
-  isBusy=true;
+  const isRight = onBook.classList.contains('sb-next') || 
+                  (!onBook.classList.contains('sb-prev') && (e.clientX-r.left)/r.width>0.5);
+  const dir=isRight?'next':'prev';
+
+  // If already animating, finish previous turn instantly with zero flash
+  if(turn){
+    idx=turn.to;
+    turn=null;
+  }
+
   startTurn(dir,0);
-  drag={dir:dir,x0:e.clientX,w:r.width,moved:0,vel:0,tPrev:performance.now()};
+  drag={
+    dir:dir,
+    x0:e.clientX,
+    w:r.width||stage.clientWidth,
+    moved:0,
+    vel:0,
+    tPrev:performance.now(),
+    downTime:performance.now()
+  };
 });
 stage.addEventListener('pointermove',e=>{
   if(!drag)return;
@@ -807,11 +890,14 @@ stage.addEventListener('pointermove',e=>{
 function endDrag(e){
   if(!drag)return;
   const d=drag;drag=null;
-  if(!turn){isBusy=false;return;}
-  if(d.moved<8){                              /* a tap, not a drag: turn exactly 1 page */
-    commit();return;
+  if(!turn)return;
+  const dt=performance.now()-(d.downTime||0);
+  // Tap or click: short duration (< 350ms) or small movement (< 15px)
+  if(d.moved<15||dt<350){
+    commit();
+    return;
   }
-  const go = turn.t>0.35 || d.vel>0.8;
+  const go = turn.t>0.32 || d.vel>0.6;
   if(go)commit(); else cancel();
 }
 stage.addEventListener('dragstart',e=>e.preventDefault());
@@ -825,41 +911,48 @@ function startTurn(dir,t){
   if(turn){idx=turn.to;turn=null;}      /* settle anything still in flight */
   if(typeof shoveLoupe==='function')shoveLoupe(dir);
   const from=idx;
-  turn={dir:dir,from:from,to:dir==='next'?(from+1)%M:(from-1+M)%M,t:t||0};
+  turn={
+    dir:dir,
+    from:from,
+    to:dir==='next'?(from+1)%M:(from-1+M)%M,
+    t:Math.max(0,Math.min(1,t||0))
+  };
   paint();
 }
 function commit(){
-  if(!turn){isBusy=false;return;}
+  if(!turn)return;
   if(REDUCED){
     idx=turn.to;turn=null;paint();
-    setTimeout(()=>{isBusy=false;},100);
     return;
   }
-  animateTo(1,()=>{
-    idx=turn.to;turn=null;paint();
-    setTimeout(()=>{isBusy=false;},120);
-  },170,26);
-  kick();
+  const dur=Math.max(0.18,(1-turn.t)*0.28);
+  tweenTo(1,dur,()=>{
+    idx=turn.to;
+    turn=null;
+    paint();
+  });
 }
 function cancel(){
-  if(!turn){isBusy=false;return;}
-  animateTo(0,()=>{
-    turn=null;paint();
-    setTimeout(()=>{isBusy=false;},120);
-  },150,24);
-  kick();
+  if(!turn)return;
+  const dur=Math.max(0.12,turn.t*0.24);
+  tweenTo(0,dur,()=>{
+    turn=null;
+    paint();
+  });
 }
 function step(dir){
-  if(isBusy)return;
+  if(drag)return;
   if(introOn)endIntro();
-  isBusy=true;
+  if(turn){
+    idx=turn.to;
+    turn=null;
+  }
   startTurn(dir,0);
   commit();
 }
 function goTo(i){
-  if(isBusy||i===idx)return;
+  if(i===idx)return;
   if(introOn)endIntro();
-  isBusy=true;
   if(turn){idx=turn.to;turn=null;}
   const fwd=(i-idx+M)%M, back=(idx-i+M)%M;
   if(Math.min(fwd,back)===1){
@@ -867,7 +960,6 @@ function goTo(i){
     return;
   }
   idx=i;paint();
-  setTimeout(()=>{isBusy=false;},100);
 }
 document.getElementById('sbLeft').onclick=(e)=>{
   e.preventDefault();
@@ -922,6 +1014,7 @@ const zoomWrap=document.getElementById('zoomWrap');
 const zoomInner=document.getElementById('zoomInner');
 /* mirror whatever the book is currently showing into the magnified copy */
 function syncZoomLayer(){
+  if(!loupeOn)return;
   zoomInner.textContent='';
   for(const c of book.children){
     if(c.classList.contains('sb-zone'))continue;      /* hit targets need no copy */
@@ -1067,7 +1160,11 @@ function startIntro(){
 /* ------------------------------------------------------------- boot */
 (async function boot(){
   idx=Q.has('shot')?(parseInt(Q.get('shot'),10)||0)%M:0;
-  paint();applyView();
+  initBookDOM();
+  paint();
+  applyView();
+
+  // Pre-decode all 6 plates in parallel so every page flip has 0ms rasterization latency
   await Promise.all(PAGES.map(p=>{
     const im=new Image();im.src=p.url;
     return im.decode?im.decode().catch(()=>{}):new Promise(r=>{im.onload=im.onerror=r});

@@ -596,6 +596,8 @@ if (bgAudio && audioToggleBtn) {
     "touchstart",
     "touchend",
     "keydown",
+    "wheel",
+    "scroll",
   ];
   const handleFirstGesture = (e) => {
     if (e.target && e.target.closest && e.target.closest("#audioToggleBtn")) return;
@@ -614,27 +616,43 @@ if (bgAudio && audioToggleBtn) {
 
   function cleanupGestureListeners() {
     gestureEvents.forEach((evt) => {
-      window.removeEventListener(evt, handleFirstGesture);
-      document.removeEventListener(evt, handleFirstGesture);
+      window.removeEventListener(evt, handleFirstGesture, true);
+      document.removeEventListener(evt, handleFirstGesture, true);
     });
   }
 
   gestureEvents.forEach((evt) => {
-    window.addEventListener(evt, handleFirstGesture, { passive: true });
-    document.addEventListener(evt, handleFirstGesture, { passive: true });
+    window.addEventListener(evt, handleFirstGesture, { capture: true, passive: true });
+    document.addEventListener(evt, handleFirstGesture, { capture: true, passive: true });
   });
 
   const loaderEl = document.getElementById("loader");
   if (loaderEl) {
     ["click", "pointerdown", "touchstart", "touchend"].forEach((evt) => {
-      loaderEl.addEventListener(evt, handleFirstGesture, { passive: true });
+      loaderEl.addEventListener(evt, handleFirstGesture, { capture: true, passive: true });
     });
   }
 
-  // Attempt initial playback immediately with unmuted sound
-  startAudioPlayback().catch(() => {});
-  window.addEventListener("load", () => startAudioPlayback().catch(() => {}), { once: true });
-  document.addEventListener("DOMContentLoaded", () => startAudioPlayback().catch(() => {}), { once: true });
+  // Attempt initial playback immediately with unmuted sound and sync UI
+  if (bgAudio && !bgAudio.paused && !bgAudio.muted) {
+    updateAudioUI(true);
+  } else {
+    startAudioPlayback().catch(() => {});
+  }
+  window.addEventListener("load", () => {
+    if (bgAudio && !bgAudio.paused && !bgAudio.muted) {
+      updateAudioUI(true);
+    } else {
+      startAudioPlayback().catch(() => {});
+    }
+  }, { once: true });
+  document.addEventListener("DOMContentLoaded", () => {
+    if (bgAudio && !bgAudio.paused && !bgAudio.muted) {
+      updateAudioUI(true);
+    } else {
+      startAudioPlayback().catch(() => {});
+    }
+  }, { once: true });
 }
 
 /* ---------- init execution ---------- */

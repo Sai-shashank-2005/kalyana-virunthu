@@ -31,6 +31,7 @@
   <link rel="preload" as="image" href="images/groomhand.webp" type="image/webp" fetchpriority="high">
   <link rel="preload" as="image" href="images/bridehand.webp" type="image/webp" fetchpriority="high">
   <link rel="preload" as="image" href="images/groomhandcut.webp" type="image/webp" fetchpriority="high">
+  <link rel="preload" as="audio" href="audio/song.mpeg" type="audio/mpeg" fetchpriority="high">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,6 +43,42 @@
 </head>
 
 <body>
+
+  <!-- ZERO-DELAY BACKGROUND AUDIO STREAM & INSTANT AUTOPLAY -->
+  <audio id="bgAudio" loop autoplay playsinline preload="auto">
+    <source src="audio/song.mpeg" type="audio/mpeg">
+    <source src="audio/song.mpeg" type="audio/mp3">
+  </audio>
+  <script>
+    (function(){
+      try {
+        var a = document.getElementById('bgAudio');
+        if (a) {
+          a.volume = 0.65;
+          a.muted = false;
+          var p = a.play();
+          if (p !== undefined) {
+            p.catch(function(){
+              var unlock = function(){
+                if (!a) return;
+                a.muted = false;
+                a.volume = 0.65;
+                a.play().catch(function(){});
+                ['pointerdown','touchstart','click','keydown','wheel','scroll'].forEach(function(ev){
+                  window.removeEventListener(ev, unlock, true);
+                  document.removeEventListener(ev, unlock, true);
+                });
+              };
+              ['pointerdown','touchstart','click','keydown','wheel','scroll'].forEach(function(ev){
+                window.addEventListener(ev, unlock, { capture: true, passive: true, once: true });
+                document.addEventListener(ev, unlock, { capture: true, passive: true, once: true });
+              });
+            });
+          }
+        }
+      } catch(e) {}
+    })();
+  </script>
 
   <!-- LOADING SCREEN — covers everything until the artwork has decoded.
        Removed from the DOM once done, so it costs nothing afterwards. -->
@@ -479,25 +516,6 @@
 
   <!-- FLOATING BACKGROUND MUSIC PLAYER -->
   <aside class="audio-player" id="audioPlayer" aria-label="Background Music Player">
-    <audio id="bgAudio" loop autoplay playsinline preload="auto">
-      <source src="audio/song.mpeg" type="audio/mpeg">
-      <source src="audio/song.mpeg" type="audio/mp3">
-    </audio>
-    <script>
-      (function(){
-        try {
-          var a = document.getElementById('bgAudio');
-          if (a) {
-            a.volume = 0.65;
-            a.muted = false;
-            var p = a.play();
-            if (p !== undefined) {
-              p.catch(function(){});
-            }
-          }
-        } catch(e) {}
-      })();
-    </script>
     <button class="audio-toggle-btn" id="audioToggleBtn" type="button" aria-label="Pause background music" title="Toggle background music">
       <div class="audio-bars" id="audioBars" aria-hidden="true" style="display: none;">
         <span class="bar bar-1"></span>
