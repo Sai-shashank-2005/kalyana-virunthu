@@ -81,6 +81,7 @@ let ticking = false;
 let autoRAF = null;
 let autoTimeout = null;
 let autoDone = false;
+let isAutoScrolling = false;
 
 function getScrollProgress() {
   if (!heroTrack) return 0;
@@ -166,13 +167,14 @@ function render(raw) {
   }
 
   if (scrollCue) {
-    scrollCue.style.opacity = 1 - clamp(raw * 3, 0, 1);
+    scrollCue.style.opacity = 1 - stageProgress(raw, 0.85, 1.0);
   }
 }
 
 /* ---------- native scroll handler ---------- */
 
 function onScroll() {
+  if (isAutoScrolling) return;
   cancelAuto();
   if (!ticking) {
     ticking = true;
@@ -197,16 +199,35 @@ function cancelAuto() {
     clearTimeout(autoTimeout);
     autoTimeout = null;
   }
+  isAutoScrolling = false;
   autoDone = true;
+  document.documentElement.style.scrollBehavior = "";
 }
 
-function animateProgress(from, to, duration, onDone) {
+function animateProgress(fromProgress, toProgress, duration, onDone) {
   const t0 = performance.now();
+  isAutoScrolling = true;
+  document.documentElement.style.scrollBehavior = "auto";
+  const maxScroll = heroTrack ? Math.max(0, heroTrack.offsetHeight - window.innerHeight) : 0;
+  const fromY = fromProgress * maxScroll;
+  const toY = toProgress * maxScroll;
+
   const step = (now) => {
-    if (autoDone) return;
+    if (autoDone) {
+      isAutoScrolling = false;
+      document.documentElement.style.scrollBehavior = "";
+      return;
+    }
     const t = clamp((now - t0) / duration, 0, 1);
-    currentProgress = from + (to - from) * easeIO(t);
+    const easedT = easeIO(t);
+    currentProgress = fromProgress + (toProgress - fromProgress) * easedT;
+    const targetY = fromY + (toY - fromY) * easedT;
+
+    if (maxScroll > 0) {
+      window.scrollTo({ top: targetY, behavior: "instant" });
+    }
     render(currentProgress);
+
     if (t < 1) {
       autoRAF = requestAnimationFrame(step);
     } else {
@@ -222,14 +243,21 @@ function startAuto() {
   const scrollY = window.scrollY || window.pageYOffset || 0;
   if (scrollY > 20) {
     autoDone = true;
+    isAutoScrolling = false;
     currentProgress = getScrollProgress();
     render(currentProgress);
     return;
   }
 
+  const maxScroll = heroTrack ? Math.max(0, heroTrack.offsetHeight - window.innerHeight) : 0;
+
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     currentProgress = AUTO.TARGET;
     autoDone = true;
+    isAutoScrolling = false;
+    if (maxScroll > 0) {
+      window.scrollTo({ top: currentProgress * maxScroll, behavior: "instant" });
+    }
     render(currentProgress);
     return;
   }
@@ -243,15 +271,22 @@ function startAuto() {
       autoTimeout = null;
       animateProgress(meetPos, finalPos, AUTO.PHASE2_DURATION, () => {
         autoDone = true;
+        isAutoScrolling = false;
+        document.documentElement.style.scrollBehavior = "";
       });
     }, AUTO.PAUSE);
   });
 }
 
-// User interactions cancel auto-play smoothly
-window.addEventListener("touchstart", cancelAuto, { passive: true, once: true });
-window.addEventListener("wheel", cancelAuto, { passive: true, once: true });
-window.addEventListener("keydown", cancelAuto, { passive: true, once: true });
+// User interactions cancel auto-play smoothly and hand full manual control over
+const handleUserScrollInterrupt = () => {
+  if (autoDone) return;
+  cancelAuto();
+};
+window.addEventListener("touchstart", handleUserScrollInterrupt, { passive: true });
+window.addEventListener("wheel", handleUserScrollInterrupt, { passive: true });
+window.addEventListener("pointerdown", handleUserScrollInterrupt, { passive: true });
+window.addEventListener("keydown", handleUserScrollInterrupt, { passive: true });
 
 /* ---------- scroll cue click ---------- */
 
@@ -259,6 +294,7 @@ if (scrollCue) {
   scrollCue.style.cursor = "pointer";
   scrollCue.addEventListener("click", () => {
     cancelAuto();
+    document.documentElement.style.scrollBehavior = "";
     const nextSec = document.getElementById("auspicious");
     if (nextSec) {
       nextSec.scrollIntoView({ behavior: "smooth" });
@@ -382,19 +418,54 @@ function finish() {
   setProgress(1);
   preloadDecorativeAssets();
 
-  setTimeout(() => {
+  const liftCurtain = () => {
     if (loader) {
       loader.classList.add("loader--done");
       setTimeout(() => loader && loader.remove(), 800);
     }
-    // Ensure music is triggered and unmuted when curtain lifts
-    if (bgAudio && !userExplicitlyPaused) {
-      bgAudio.muted = false;
-      bgAudio.volume = 0.65;
-      bgAudio.play().then(() => updateAudioUI(true)).catch(() => {});
-    }
     setTimeout(startAuto, AUTO.DELAY);
-  }, 420);
+  };
+
+  // If audio is already playing unmuted (or can play immediately), lift curtain smoothly
+  startAudioPlayback().then((started) => {
+    if (started) {
+      setTimeout(liftCurtain, 420);
+    } else {
+      // Browser blocked unmuted autoplay without prior gesture.
+      // Reveal the elegant 'Open Invitation' button on the loader.
+      const enterBtn = document.getElementById("loaderEnterBtn");
+      const msgEl = document.getElementById("loaderMsg");
+      const cueEl = document.getElementById("loaderMusicCue");
+      if (cueEl) cueEl.textContent = "♫ Tap anywhere to open with music";
+      if (msgEl) msgEl.textContent = "Welcome to the Wedding";
+      if (enterBtn) enterBtn.classList.add("is-visible");
+
+      let curtainLifted = false;
+      const onUserEnter = () => {
+        if (curtainLifted) return;
+        curtainLifted = true;
+        startAudioPlayback();
+        liftCurtain();
+      };
+
+      if (enterBtn) {
+        enterBtn.addEventListener("click", onUserEnter, { once: true });
+      }
+      if (loader) {
+        loader.style.cursor = "pointer";
+        loader.addEventListener("click", onUserEnter, { once: true });
+        loader.addEventListener("touchend", onUserEnter, { once: true });
+      }
+
+      // Safety timeout: auto-lift after 3.5s so visitor is never trapped
+      setTimeout(() => {
+        if (!curtainLifted) {
+          curtainLifted = true;
+          liftCurtain();
+        }
+      }, 3500);
+    }
+  });
 }
 
 function bumpLoaded() {
@@ -458,28 +529,33 @@ const audioBars = document.getElementById("audioBars");
 const audioIconMuted = document.getElementById("audioIconMuted");
 const audioLabel = document.getElementById("audioLabel");
 
+let isAudioPlaying = false;
 let userExplicitlyPaused = false;
 
-function updateAudioUI(isPlaying) {
+function updateAudioUI(playing) {
   if (!audioToggleBtn) return;
-  const actuallyOff = userExplicitlyPaused && !isPlaying;
-  if (!actuallyOff) {
+  isAudioPlaying = !!playing;
+  if (playing) {
     audioToggleBtn.classList.add("is-playing");
     if (audioBars) audioBars.style.display = "flex";
     if (audioIconMuted) audioIconMuted.style.display = "none";
     if (audioLabel) audioLabel.textContent = "Music";
     audioToggleBtn.setAttribute("aria-label", "Pause background music");
+    audioToggleBtn.setAttribute("title", "Pause background music");
+    const cueEl = document.getElementById("loaderMusicCue");
+    if (cueEl) cueEl.textContent = "♫ Music Playing";
   } else {
     audioToggleBtn.classList.remove("is-playing");
     if (audioBars) audioBars.style.display = "none";
     if (audioIconMuted) audioIconMuted.style.display = "block";
     if (audioLabel) audioLabel.textContent = "Music Off";
     audioToggleBtn.setAttribute("aria-label", "Play background music");
+    audioToggleBtn.setAttribute("title", "Play background music");
   }
 }
 
 function startAudioPlayback() {
-  if (!bgAudio || userExplicitlyPaused) return Promise.resolve();
+  if (!bgAudio || userExplicitlyPaused) return Promise.resolve(false);
   bgAudio.muted = false;
   bgAudio.volume = 0.65;
   const promise = bgAudio.play();
@@ -487,20 +563,15 @@ function startAudioPlayback() {
     return promise
       .then(() => {
         updateAudioUI(true);
+        return true;
       })
-      .catch((err) => {
-        // Fall back to muted stream so audio timeline runs from load,
-        // and un-mutes to full volume on first visitor touch/click/scroll
-        bgAudio.muted = true;
-        bgAudio.play().then(() => {
-          updateAudioUI(true);
-        }).catch(() => {
-          updateAudioUI(true);
-        });
-        throw err;
+      .catch(() => {
+        // Autoplay blocked by browser policy without prior user gesture
+        updateAudioUI(false);
+        return false;
       });
   }
-  return Promise.resolve();
+  return Promise.resolve(false);
 }
 
 const playAudio = startAudioPlayback;
@@ -513,27 +584,29 @@ function pauseAudioPlayback() {
 
 if (bgAudio && audioToggleBtn) {
   // Sync UI automatically on audio element state changes
-  bgAudio.addEventListener("playing", () => updateAudioUI(true));
-  bgAudio.addEventListener("play", () => updateAudioUI(true));
+  bgAudio.addEventListener("playing", () => {
+    if (!bgAudio.muted) updateAudioUI(true);
+  });
+  bgAudio.addEventListener("play", () => {
+    if (!bgAudio.muted) updateAudioUI(true);
+  });
   bgAudio.addEventListener("pause", () => {
-    if (userExplicitlyPaused) updateAudioUI(false);
+    updateAudioUI(false);
   });
   bgAudio.addEventListener("ended", () => {
-    if (userExplicitlyPaused) updateAudioUI(false);
+    updateAudioUI(false);
   });
 
   // Toggle button click: toggle playback directly without any race condition
   const handleToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!bgAudio.paused && !bgAudio.muted) {
+    if (bgAudio && !bgAudio.paused && !bgAudio.muted) {
       userExplicitlyPaused = true;
       pauseAudioPlayback();
     } else {
       userExplicitlyPaused = false;
-      bgAudio.muted = false;
-      bgAudio.volume = 0.65;
-      bgAudio.play().then(() => updateAudioUI(true)).catch(() => {});
+      startAudioPlayback();
     }
   };
 
@@ -547,24 +620,18 @@ if (bgAudio && audioToggleBtn) {
     "click",
     "touchstart",
     "touchend",
-    "touchmove",
-    "scroll",
-    "wheel",
     "keydown",
   ];
   const handleFirstGesture = (e) => {
     if (e.target && e.target.closest && e.target.closest("#audioToggleBtn")) return;
     if (userExplicitlyPaused) return;
 
-    if (bgAudio) {
-      bgAudio.muted = false;
-      bgAudio.volume = 0.65;
-      bgAudio.play()
-        .then(() => {
-          updateAudioUI(true);
+    if (!isAudioPlaying) {
+      startAudioPlayback().then((started) => {
+        if (started) {
           cleanupGestureListeners();
-        })
-        .catch(() => {});
+        }
+      });
     }
   };
 
