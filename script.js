@@ -65,6 +65,12 @@ const AUTO = {
   TARGET: TEXT_FADE.END,
 };
 
+const SCROLL_CONFIG = {
+  SPEED: 48,               // Pixels per second: graceful, leisurely reading pace
+  IDLE_RESUME_DELAY: 2000, // Milliseconds of idle inactivity before auto-scroll resumes
+  PAUSE_AT_NAMES: 1200,    // Pause at couple title during intro
+};
+
 /* ---------- helpers ---------- */
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
@@ -78,10 +84,13 @@ const easeIO = (t) =>
 
 let currentProgress = 0;
 let ticking = false;
-let autoRAF = null;
-let autoTimeout = null;
-let autoDone = false;
 let isAutoScrolling = false;
+let lastAutoScrollTimestamp = 0;
+let autoScrollRAF = null;
+let idleResumeTimer = null;
+let isUserTouching = false;
+let isIntroActive = false;
+let hasIntroRun = false;
 
 function getScrollProgress() {
   if (!heroTrack) return 0;
@@ -174,8 +183,14 @@ function render(raw) {
 /* ---------- native scroll handler ---------- */
 
 function onScroll() {
-  if (isAutoScrolling) return;
-  cancelAuto();
+  const wasTriggeredByAuto = isAutoScrolling || (performance.now() - lastAutoScrollTimestamp < 60);
+  if (wasTriggeredByAuto) {
+    return;
+  }
+
+  // User is actively scrolling manually
+  pauseAutoScroll();
+
   if (!ticking) {
     ticking = true;
     requestAnimationFrame(() => {
@@ -184,24 +199,86 @@ function onScroll() {
       ticking = false;
     });
   }
+
+  resetIdleTimer();
 }
 
 window.addEventListener("scroll", onScroll, { passive: true });
 
-/* ---------- auto-intro (plays once, user scroll cancels) ---------- */
+/* ---------- continuous auto-scrolling & intro engine ---------- */
 
-function cancelAuto() {
-  if (autoRAF !== null) {
-    cancelAnimationFrame(autoRAF);
-    autoRAF = null;
+function pauseAutoScroll() {
+  if (autoScrollRAF !== null) {
+    cancelAnimationFrame(autoScrollRAF);
+    autoScrollRAF = null;
   }
-  if (autoTimeout !== null) {
-    clearTimeout(autoTimeout);
-    autoTimeout = null;
+  if (isIntroActive) {
+    isIntroActive = false;
+    hasIntroRun = true;
   }
   isAutoScrolling = false;
-  autoDone = true;
   document.documentElement.style.scrollBehavior = "";
+}
+
+function resetIdleTimer() {
+  if (idleResumeTimer !== null) {
+    clearTimeout(idleResumeTimer);
+    idleResumeTimer = null;
+  }
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return;
+  }
+
+  idleResumeTimer = setTimeout(() => {
+    idleResumeTimer = null;
+    if (isUserTouching) {
+      return; // User finger still down on screen
+    }
+    const maxDocScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const currentY = window.scrollY || window.pageYOffset || 0;
+    if (currentY >= maxDocScroll - 4) {
+      return; // Already at bottom of the page
+    }
+    startContinuousScroll();
+  }, SCROLL_CONFIG.IDLE_RESUME_DELAY);
+}
+
+function startContinuousScroll() {
+  if (autoScrollRAF !== null) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  let lastTime = performance.now();
+  document.documentElement.style.scrollBehavior = "auto";
+
+  function scrollStep(now) {
+    const maxDocScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const currentY = window.scrollY || window.pageYOffset || 0;
+
+    if (currentY >= maxDocScroll - 2) {
+      pauseAutoScroll();
+      return;
+    }
+
+    const dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+
+    const nextY = Math.min(currentY + SCROLL_CONFIG.SPEED * dt, maxDocScroll);
+
+    isAutoScrolling = true;
+    lastAutoScrollTimestamp = performance.now();
+    window.scrollTo({ top: nextY, behavior: "instant" });
+
+    if (heroTrack) {
+      currentProgress = getScrollProgress();
+      render(currentProgress);
+    }
+
+    isAutoScrolling = false;
+    autoScrollRAF = requestAnimationFrame(scrollStep);
+  }
+
+  autoScrollRAF = requestAnimationFrame(scrollStep);
 }
 
 function animateProgress(fromProgress, toProgress, duration, onDone) {
@@ -213,7 +290,7 @@ function animateProgress(fromProgress, toProgress, duration, onDone) {
   const toY = toProgress * maxScroll;
 
   const step = (now) => {
-    if (autoDone) {
+    if (!isIntroActive) {
       isAutoScrolling = false;
       document.documentElement.style.scrollBehavior = "";
       return;
@@ -223,82 +300,118 @@ function animateProgress(fromProgress, toProgress, duration, onDone) {
     currentProgress = fromProgress + (toProgress - fromProgress) * easedT;
     const targetY = fromY + (toY - fromY) * easedT;
 
+    lastAutoScrollTimestamp = performance.now();
     if (maxScroll > 0) {
       window.scrollTo({ top: targetY, behavior: "instant" });
     }
     render(currentProgress);
 
     if (t < 1) {
-      autoRAF = requestAnimationFrame(step);
+      autoScrollRAF = requestAnimationFrame(step);
     } else {
-      autoRAF = null;
+      autoScrollRAF = null;
+      isAutoScrolling = false;
       if (onDone) onDone();
     }
   };
-  autoRAF = requestAnimationFrame(step);
+  autoScrollRAF = requestAnimationFrame(step);
 }
 
-function startAuto() {
-  if (autoDone) return;
+function startIntroFlow() {
+  if (hasIntroRun) return;
   const scrollY = window.scrollY || window.pageYOffset || 0;
-  if (scrollY > 20) {
-    autoDone = true;
-    isAutoScrolling = false;
-    currentProgress = getScrollProgress();
-    render(currentProgress);
+  if (scrollY > 20 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    hasIntroRun = true;
+    startContinuousScroll();
     return;
   }
 
-  const maxScroll = heroTrack ? Math.max(0, heroTrack.offsetHeight - window.innerHeight) : 0;
-
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    currentProgress = AUTO.TARGET;
-    autoDone = true;
-    isAutoScrolling = false;
-    if (maxScroll > 0) {
-      window.scrollTo({ top: currentProgress * maxScroll, behavior: "instant" });
-    }
-    render(currentProgress);
-    return;
-  }
-
+  isIntroActive = true;
   const meetPos = HANDS_PHASE;
   const finalPos = AUTO.TARGET;
 
   animateProgress(0, meetPos, AUTO.PHASE1_DURATION, () => {
-    autoTimeout = setTimeout(() => {
-      if (autoDone) return;
-      autoTimeout = null;
+    if (!isIntroActive) return;
+    setTimeout(() => {
+      if (!isIntroActive) return;
       animateProgress(meetPos, finalPos, AUTO.PHASE2_DURATION, () => {
-        autoDone = true;
-        isAutoScrolling = false;
-        document.documentElement.style.scrollBehavior = "";
+        if (!isIntroActive) return;
+        setTimeout(() => {
+          if (!isIntroActive) return;
+          isIntroActive = false;
+          hasIntroRun = true;
+          startContinuousScroll();
+        }, SCROLL_CONFIG.PAUSE_AT_NAMES);
       });
     }, AUTO.PAUSE);
   });
 }
 
-// User interactions cancel auto-play smoothly and hand full manual control over
-const handleUserScrollInterrupt = () => {
-  if (autoDone) return;
-  cancelAuto();
+// User interactions immediately yield full manual control to the user
+const handleUserActivityStart = () => {
+  pauseAutoScroll();
+  resetIdleTimer();
 };
-window.addEventListener("touchstart", handleUserScrollInterrupt, { passive: true });
-window.addEventListener("wheel", handleUserScrollInterrupt, { passive: true });
-window.addEventListener("pointerdown", handleUserScrollInterrupt, { passive: true });
-window.addEventListener("keydown", handleUserScrollInterrupt, { passive: true });
+
+window.addEventListener("touchstart", () => {
+  isUserTouching = true;
+  handleUserActivityStart();
+}, { passive: true });
+
+window.addEventListener("touchmove", () => {
+  isUserTouching = true;
+  handleUserActivityStart();
+}, { passive: true });
+
+window.addEventListener("touchend", () => {
+  isUserTouching = false;
+  resetIdleTimer();
+}, { passive: true });
+
+window.addEventListener("touchcancel", () => {
+  isUserTouching = false;
+  resetIdleTimer();
+}, { passive: true });
+
+window.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "touch") isUserTouching = true;
+  handleUserActivityStart();
+}, { passive: true });
+
+window.addEventListener("pointerup", () => {
+  isUserTouching = false;
+  resetIdleTimer();
+}, { passive: true });
+
+window.addEventListener("wheel", handleUserActivityStart, { passive: true });
+
+window.addEventListener("keydown", (e) => {
+  const scrollKeys = ["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Space", "Home", "End"];
+  if (scrollKeys.includes(e.code) || scrollKeys.includes(e.key)) {
+    handleUserActivityStart();
+  }
+}, { passive: true });
+
+window.addEventListener("blur", () => {
+  pauseAutoScroll();
+});
+
+window.addEventListener("focus", () => {
+  resetIdleTimer();
+});
 
 /* ---------- scroll cue click ---------- */
 
 if (scrollCue) {
   scrollCue.style.cursor = "pointer";
   scrollCue.addEventListener("click", () => {
-    cancelAuto();
+    pauseAutoScroll();
     document.documentElement.style.scrollBehavior = "";
     const nextSec = document.getElementById("auspicious");
     if (nextSec) {
       nextSec.scrollIntoView({ behavior: "smooth" });
     }
+    resetIdleTimer();
   });
 }
 
@@ -307,17 +420,20 @@ if (scrollCue) {
 window.addEventListener(
   "resize",
   () => {
-    cancelAuto();
+    pauseAutoScroll();
     currentProgress = getScrollProgress();
     render(currentProgress);
+    resetIdleTimer();
   },
   { passive: true },
 );
 
 window.addEventListener("orientationchange", () => {
+  pauseAutoScroll();
   setTimeout(() => {
     currentProgress = getScrollProgress();
     render(currentProgress);
+    resetIdleTimer();
   }, 250);
 });
 
@@ -425,7 +541,7 @@ function finish() {
     }
     // Attempt playback immediately when curtain lifts
     startAudioPlayback().catch(() => {});
-    setTimeout(startAuto, AUTO.DELAY);
+    setTimeout(startIntroFlow, AUTO.DELAY);
   }, 420);
 }
 
@@ -592,9 +708,12 @@ if (bgAudio && audioToggleBtn) {
   // First interaction gesture to unlock unmuted sound on modern mobile/desktop browsers
   const gestureEvents = [
     "pointerdown",
+    "pointerup",
     "click",
     "touchstart",
     "touchend",
+    "mousedown",
+    "mouseup",
     "keydown",
     "wheel",
     "scroll",
@@ -628,10 +747,16 @@ if (bgAudio && audioToggleBtn) {
 
   const loaderEl = document.getElementById("loader");
   if (loaderEl) {
-    ["click", "pointerdown", "touchstart", "touchend"].forEach((evt) => {
+    ["click", "pointerdown", "pointerup", "touchstart", "touchend", "mousedown"].forEach((evt) => {
       loaderEl.addEventListener(evt, handleFirstGesture, { capture: true, passive: true });
     });
   }
+
+  bgAudio.addEventListener("canplay", () => {
+    if (!userExplicitlyPaused && (!isAudioPlaying || bgAudio.paused)) {
+      startAudioPlayback().catch(() => {});
+    }
+  }, { once: true });
 
   // Attempt initial playback immediately with unmuted sound and sync UI
   if (bgAudio && !bgAudio.paused && !bgAudio.muted) {
@@ -653,6 +778,13 @@ if (bgAudio && audioToggleBtn) {
       startAudioPlayback().catch(() => {});
     }
   }, { once: true });
+  window.addEventListener("pageshow", () => {
+    if (bgAudio && !bgAudio.paused && !bgAudio.muted) {
+      updateAudioUI(true);
+    } else {
+      startAudioPlayback().catch(() => {});
+    }
+  });
 }
 
 /* ---------- init execution ---------- */

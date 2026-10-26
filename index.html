@@ -45,7 +45,7 @@
 <body>
 
   <!-- ZERO-DELAY BACKGROUND AUDIO STREAM & INSTANT AUTOPLAY -->
-  <audio id="bgAudio" loop autoplay playsinline preload="auto">
+  <audio id="bgAudio" src="audio/song.mpeg" loop autoplay playsinline preload="auto">
     <source src="audio/song.mpeg" type="audio/mpeg">
     <source src="audio/song.mpeg" type="audio/mp3">
   </audio>
@@ -56,25 +56,29 @@
         if (a) {
           a.volume = 0.65;
           a.muted = false;
-          var p = a.play();
-          if (p !== undefined) {
-            p.catch(function(){
-              var unlock = function(){
-                if (!a) return;
-                a.muted = false;
-                a.volume = 0.65;
-                a.play().catch(function(){});
-                ['pointerdown','touchstart','click','keydown','wheel','scroll'].forEach(function(ev){
-                  window.removeEventListener(ev, unlock, true);
-                  document.removeEventListener(ev, unlock, true);
-                });
-              };
-              ['pointerdown','touchstart','click','keydown','wheel','scroll'].forEach(function(ev){
-                window.addEventListener(ev, unlock, { capture: true, passive: true, once: true });
-                document.addEventListener(ev, unlock, { capture: true, passive: true, once: true });
-              });
-            });
+          var tryPlay = function() {
+            if (!a || (!a.paused && !a.muted)) return;
+            var p = a.play();
+            if (p !== undefined) {
+              p.then(function() {
+                cleanup();
+              }).catch(function(){});
+            }
+          };
+          var cleanup = function() {
+            var evts = ['pointerdown','pointerup','touchstart','touchend','mousedown','mouseup','click','keydown','wheel','scroll'];
+            for (var i = 0; i < evts.length; i++) {
+              window.removeEventListener(evts[i], tryPlay, true);
+              document.removeEventListener(evts[i], tryPlay, true);
+            }
+          };
+          var evts = ['pointerdown','pointerup','touchstart','touchend','mousedown','mouseup','click','keydown','wheel','scroll'];
+          for (var i = 0; i < evts.length; i++) {
+            window.addEventListener(evts[i], tryPlay, { capture: true, passive: true });
+            document.addEventListener(evts[i], tryPlay, { capture: true, passive: true });
           }
+          a.addEventListener('canplay', tryPlay, { once: true });
+          tryPlay();
         }
       } catch(e) {}
     })();
@@ -408,29 +412,8 @@
       </div>
     </section>
 
-    <!-- SECTION 08: BEAUTIFUL MOMENTS (6-PAGE INTERACTIVE MEMORY SKETCHBOOK) -->
-    <section class="invitation-sec sec-sketchbook bg-sand" id="gallery">
-      <div class="sec-inner">
-        <header class="sec-header reveal">
-          <span class="sec-eyebrow">Candid &amp; Cherished</span>
-          <h2 class="sec-title">Our Beautiful Moments</h2>
-          <div class="ornament-wrap">
-            <span class="ornament-line"></span>
-            <span class="ornament-symbol">✦ ❖ ✦</span>
-            <span class="ornament-line"></span>
-          </div>
-          <p class="sec-subtitle">
-            A candid collection of our favorite casual memories, quiet laughter, and everyday adventures together. Flip through the pages of our story.
-          </p>
-        </header>
-      </div>
 
-      <div class="sketchbook-fullbleed reveal reveal-delay-1">
-        <iframe class="sketchbook-iframe" src="sketchbook/index.html" title="Our Beautiful Moments — Interactive Memory Sketchbook" loading="lazy"></iframe>
-      </div>
-    </section>
-
-    <!-- SECTION 09: TRADITIONS & CULTURAL HIGHLIGHTS -->
+    <!-- SECTION 08: TRADITIONS & CULTURAL HIGHLIGHTS -->
     <section class="invitation-sec bg-paper" id="traditions">
       <div class="sec-inner">
         <header class="sec-header reveal">

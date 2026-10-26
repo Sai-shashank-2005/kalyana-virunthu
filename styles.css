@@ -997,37 +997,6 @@ body:not(.decorative-ready) .all-text { opacity: 0 !important; }
   border-radius: 0 4px 4px 0;
 }
 
-/* SECTION 08: WEDDING MEMORY SKETCHBOOK (FULL SECTION IMMERSION) */
-.sec-sketchbook {
-  border-top: 1px solid var(--color-border);
-  padding: clamp(48px, 7vh, 80px) 0 0 0 !important;
-  overflow: hidden;
-  background-color: #ece7dc; /* seamless tone with sketchbook wash */
-}
-
-.sec-sketchbook .sec-header {
-  padding: 0 clamp(16px, 4vw, 40px);
-}
-
-.sketchbook-fullbleed {
-  width: 100%;
-  height: clamp(520px, 78vh, 700px);
-  margin: clamp(16px, 3vh, 32px) 0 0 0;
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
-  background: #ece7dc;
-  position: relative;
-  box-sizing: border-box;
-}
-
-.sketchbook-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-  background: #ece7dc;
-}
-
 /* SECTION 09: TRADITIONS / CULTURAL HIGHLIGHTS */
 .traditions-grid {
   display: grid;
@@ -1193,15 +1162,6 @@ body:not(.decorative-ready) .all-text { opacity: 0 !important; }
     transform: rotate(90deg);
     margin: 6px auto;
   }
-  .sketchbook-fullbleed {
-    height: clamp(420px, 64vh, 520px);
-  }
-}
-
-@media (max-width: 480px) {
-  .sketchbook-fullbleed {
-    height: clamp(380px, 58vh, 460px);
-  }
 }
 
 @media (max-width: 380px) {
@@ -1224,9 +1184,6 @@ body:not(.decorative-ready) .all-text { opacity: 0 !important; }
   .btn-directions {
     padding: 10px 18px;
     font-size: 0.76rem;
-  }
-  .sketchbook-fullbleed {
-    height: 380px;
   }
 }
 
