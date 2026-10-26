@@ -418,54 +418,15 @@ function finish() {
   setProgress(1);
   preloadDecorativeAssets();
 
-  const liftCurtain = () => {
+  setTimeout(() => {
     if (loader) {
       loader.classList.add("loader--done");
       setTimeout(() => loader && loader.remove(), 800);
     }
+    // Attempt playback immediately when curtain lifts
+    startAudioPlayback().catch(() => {});
     setTimeout(startAuto, AUTO.DELAY);
-  };
-
-  // If audio is already playing unmuted (or can play immediately), lift curtain smoothly
-  startAudioPlayback().then((started) => {
-    if (started) {
-      setTimeout(liftCurtain, 420);
-    } else {
-      // Browser blocked unmuted autoplay without prior gesture.
-      // Reveal the elegant 'Open Invitation' button on the loader.
-      const enterBtn = document.getElementById("loaderEnterBtn");
-      const msgEl = document.getElementById("loaderMsg");
-      const cueEl = document.getElementById("loaderMusicCue");
-      if (cueEl) cueEl.textContent = "♫ Tap anywhere to open with music";
-      if (msgEl) msgEl.textContent = "Welcome to the Wedding";
-      if (enterBtn) enterBtn.classList.add("is-visible");
-
-      let curtainLifted = false;
-      const onUserEnter = () => {
-        if (curtainLifted) return;
-        curtainLifted = true;
-        startAudioPlayback();
-        liftCurtain();
-      };
-
-      if (enterBtn) {
-        enterBtn.addEventListener("click", onUserEnter, { once: true });
-      }
-      if (loader) {
-        loader.style.cursor = "pointer";
-        loader.addEventListener("click", onUserEnter, { once: true });
-        loader.addEventListener("touchend", onUserEnter, { once: true });
-      }
-
-      // Safety timeout: auto-lift after 3.5s so visitor is never trapped
-      setTimeout(() => {
-        if (!curtainLifted) {
-          curtainLifted = true;
-          liftCurtain();
-        }
-      }, 3500);
-    }
-  });
+  }, 420);
 }
 
 function bumpLoaded() {
