@@ -495,9 +495,9 @@ let userExplicitlyPaused = false;
 
 function updateAudioUI(playing) {
   if (!audioToggleBtn) return;
-  isAudioPlaying = !!playing;
-  if (playing && bgAudio && !bgAudio.muted) {
-    audioToggleBtn.classList.remove("is-prompt");
+  const isPlayingSound = !!playing && bgAudio && !bgAudio.muted && !bgAudio.paused;
+  isAudioPlaying = isPlayingSound;
+  if (isPlayingSound) {
     audioToggleBtn.classList.add("is-playing");
     if (audioBars) audioBars.style.display = "flex";
     if (audioIconMuted) audioIconMuted.style.display = "none";
@@ -507,7 +507,6 @@ function updateAudioUI(playing) {
     const cueEl = document.getElementById("loaderMusicCue");
     if (cueEl) cueEl.textContent = "♫ Music Playing";
   } else if (userExplicitlyPaused) {
-    audioToggleBtn.classList.remove("is-prompt");
     audioToggleBtn.classList.remove("is-playing");
     if (audioBars) audioBars.style.display = "none";
     if (audioIconMuted) audioIconMuted.style.display = "block";
@@ -515,12 +514,10 @@ function updateAudioUI(playing) {
     audioToggleBtn.setAttribute("aria-label", "Play background music");
     audioToggleBtn.setAttribute("title", "Play background music");
   } else {
-    // Waiting for initial user touch/gesture to unmute sound
-    audioToggleBtn.classList.add("is-prompt");
     audioToggleBtn.classList.remove("is-playing");
     if (audioBars) audioBars.style.display = "none";
     if (audioIconMuted) audioIconMuted.style.display = "block";
-    if (audioLabel) audioLabel.textContent = "Tap for Music";
+    if (audioLabel) audioLabel.textContent = "Music";
     audioToggleBtn.setAttribute("aria-label", "Play background music");
     audioToggleBtn.setAttribute("title", "Play background music");
   }
