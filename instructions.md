@@ -26,7 +26,7 @@ The result should feel like elegant wedding stationery brought to life on the we
 - Date: **Monday, 16 November 2026**
 - Venue: **Thangam Residency**
 - Address: **New Bus Stand, Nanguneri Road, Tirunelveli – 627005**
-- Time: **4:00 PM to 8:00 PM**
+- Time: **5:00 PM to 8:00 PM**
 
 ### Invitation message
 Use polished, natural English based on this sentiment:
@@ -141,7 +141,7 @@ Design direction:
 Clearly display:
 - Monday, 16 November 2026
 - Reception
-- 4:00 PM – 8:00 PM
+- 5:00 PM – 8:00 PM
 - Thangam Residency
 - New Bus Stand, Nanguneri Road, Tirunelveli – 627005
 

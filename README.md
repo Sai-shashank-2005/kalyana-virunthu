@@ -18,7 +18,7 @@ Featuring a custom scroll-driven parallax hero, warm ivory paper stationery styl
 
 ### 🎊 Wedding Reception
 - **Date:** Monday, 16 November 2026
-- **Time:** 4:00 PM – 8:00 PM
+- **Time:** 5:00 PM – 8:00 PM
 - **Venue:** Thangam Residency, New Bus Stand, Nanguneri Road, Tirunelveli – 627005
 
 ---
