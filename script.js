@@ -445,7 +445,7 @@ function initScrollReveals() {
 }
 
 /* ============================================================
-   BACKGROUND MUSIC CONTROLLER (DEFAULT AUTOPLAY)
+   BACKGROUND MUSIC CONTROLLER (BULLETPROOF TOGGLE & AUTOPLAY)
    ============================================================ */
 
 const bgAudio = document.getElementById("bgAudio");
@@ -454,13 +454,12 @@ const audioBars = document.getElementById("audioBars");
 const audioIconMuted = document.getElementById("audioIconMuted");
 const audioLabel = document.getElementById("audioLabel");
 
-let isAudioPlaying = false;
-let userAudioMuted = false;
-let fadeInterval = null;
+let userExplicitlyPaused = false;
+let fadeTimer = null;
 
-function updateAudioUI(playing) {
+function updateAudioUI(isPlaying) {
   if (!audioToggleBtn) return;
-  if (playing && bgAudio && !bgAudio.muted) {
+  if (isPlaying) {
     audioToggleBtn.classList.add("is-playing");
     if (audioBars) audioBars.style.display = "flex";
     if (audioIconMuted) audioIconMuted.style.display = "none";
@@ -475,121 +474,112 @@ function updateAudioUI(playing) {
   }
 }
 
-function fadeInAudio() {
+function fadeIn(targetVolume = 0.55, duration = 1200) {
   if (!bgAudio) return;
-  if (fadeInterval) clearInterval(fadeInterval);
-  let vol = bgAudio.volume;
-  const targetVol = 0.55;
-  fadeInterval = setInterval(() => {
-    vol += 0.05;
-    if (vol >= targetVol) {
-      bgAudio.volume = targetVol;
-      clearInterval(fadeInterval);
-      fadeInterval = null;
-    } else {
-      bgAudio.volume = vol;
+  if (fadeTimer) clearInterval(fadeTimer);
+  const stepTime = 50;
+  const steps = duration / stepTime;
+  const startVol = bgAudio.volume;
+  const volStep = (targetVolume - startVol) / steps;
+  let currentStep = 0;
+
+  fadeTimer = setInterval(() => {
+    currentStep++;
+    const nextVol = Math.min(targetVolume, Math.max(0, startVol + volStep * currentStep));
+    bgAudio.volume = nextVol;
+    if (currentStep >= steps || nextVol >= targetVolume) {
+      bgAudio.volume = targetVolume;
+      clearInterval(fadeTimer);
+      fadeTimer = null;
     }
-  }, 60);
+  }, stepTime);
 }
 
-function playAudio() {
-  if (!bgAudio || userAudioMuted) return;
+function startAudioPlayback(withFade = true) {
+  if (!bgAudio || userExplicitlyPaused) return Promise.resolve();
   bgAudio.muted = false;
-  const playPromise = bgAudio.play();
-  if (playPromise !== undefined) {
-    playPromise
+  if (withFade) {
+    bgAudio.volume = 0;
+  } else {
+    bgAudio.volume = 0.55;
+  }
+  const promise = bgAudio.play();
+  if (promise !== undefined) {
+    return promise
       .then(() => {
-        isAudioPlaying = true;
         updateAudioUI(true);
-        fadeInAudio();
+        if (withFade) fadeIn(0.55);
       })
-      .catch(() => {
-        // Unmuted autoplay blocked by browser policy.
-        // Fall back to muted playback so audio stream is active on default:
-        bgAudio.muted = true;
-        bgAudio.play()
-          .then(() => {
-            isAudioPlaying = true;
-            updateAudioUI(true);
-          })
-          .catch(() => {
-            isAudioPlaying = false;
-            updateAudioUI(false);
-          });
+      .catch((err) => {
+        // Autoplay blocked without user gesture
+        updateAudioUI(false);
+        throw err;
       });
   }
+  return Promise.resolve();
 }
 
-function pauseAudio() {
+function pauseAudioPlayback() {
   if (!bgAudio) return;
+  if (fadeTimer) {
+    clearInterval(fadeTimer);
+    fadeTimer = null;
+  }
   bgAudio.pause();
-  isAudioPlaying = false;
-  userAudioMuted = true;
   updateAudioUI(false);
 }
 
-// Unmute with sound as soon as visitor touches, clicks, or scrolls anywhere
-function unmuteOnGesture() {
-  if (userAudioMuted || !bgAudio) return;
-  bgAudio.muted = false;
-  const playPromise = bgAudio.play();
-  if (playPromise !== undefined) {
-    playPromise
+if (bgAudio && audioToggleBtn) {
+  // Sync UI automatically on audio element state changes
+  bgAudio.addEventListener("playing", () => updateAudioUI(true));
+  bgAudio.addEventListener("pause", () => updateAudioUI(false));
+  bgAudio.addEventListener("ended", () => updateAudioUI(false));
+
+  // Toggle button click: toggle playback directly without any race condition
+  const handleToggle = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!bgAudio.paused && !bgAudio.muted) {
+      userExplicitlyPaused = true;
+      pauseAudioPlayback();
+    } else {
+      userExplicitlyPaused = false;
+      startAudioPlayback(false);
+    }
+  };
+
+  audioToggleBtn.addEventListener("click", handleToggle);
+  audioToggleBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+  audioToggleBtn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+
+  // First interaction gesture to unlock audio on modern browsers
+  const gestureEvents = ["pointerdown", "click", "touchstart", "keydown"];
+  const handleFirstGesture = (e) => {
+    if (e.target && e.target.closest && e.target.closest("#audioToggleBtn")) return;
+    if (userExplicitlyPaused) return;
+
+    startAudioPlayback(true)
       .then(() => {
-        isAudioPlaying = true;
-        updateAudioUI(true);
-        fadeInAudio();
+        cleanupGestureListeners();
       })
       .catch(() => {});
+  };
+
+  function cleanupGestureListeners() {
+    gestureEvents.forEach((evt) => {
+      window.removeEventListener(evt, handleFirstGesture);
+      document.removeEventListener(evt, handleFirstGesture);
+    });
   }
 
-  const gestureEvents = [
-    "click",
-    "pointerdown",
-    "mousedown",
-    "touchstart",
-    "touchend",
-    "scroll",
-    "wheel",
-    "keydown",
-  ];
   gestureEvents.forEach((evt) => {
-    window.removeEventListener(evt, unmuteOnGesture);
-    document.removeEventListener(evt, unmuteOnGesture);
-  });
-}
-
-if (bgAudio && audioToggleBtn) {
-  bgAudio.volume = 0; // for smooth fade-in
-
-  const gestureEvents = [
-    "click",
-    "pointerdown",
-    "mousedown",
-    "touchstart",
-    "touchend",
-    "scroll",
-    "wheel",
-    "keydown",
-  ];
-  gestureEvents.forEach((evt) => {
-    window.addEventListener(evt, unmuteOnGesture, { once: true, passive: true });
-    document.addEventListener(evt, unmuteOnGesture, { once: true, passive: true });
+    window.addEventListener(evt, handleFirstGesture, { passive: true });
+    document.addEventListener(evt, handleFirstGesture, { passive: true });
   });
 
-  // Attempt default playback immediately
-  playAudio();
-  window.addEventListener("load", playAudio, { once: true });
-  document.addEventListener("DOMContentLoaded", playAudio, { once: true });
-
-  audioToggleBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (isAudioPlaying && bgAudio && !bgAudio.muted && !bgAudio.paused) {
-      pauseAudio();
-    } else {
-      userAudioMuted = false;
-      playAudio();
-    }
+  // Attempt initial autoplay on load
+  startAudioPlayback(true).catch(() => {
+    updateAudioUI(false);
   });
 }
 
