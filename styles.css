@@ -142,6 +142,17 @@ body {
 
 .loader-msg.is-swapping { opacity: 0; }
 
+.loader-music-cue {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(0.6rem, 1.2vmin, 0.74rem);
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--color-antique-gold);
+  margin-top: 12px;
+  opacity: 0.85;
+}
+
 /* ---------- HERO SCROLL TRACK ---------- */
 
 .hero-scroll-track {

@@ -387,8 +387,12 @@ function finish() {
       loader.classList.add("loader--done");
       setTimeout(() => loader && loader.remove(), 800);
     }
-    // Ensure music is triggered when curtain lifts
-    startAudioPlayback();
+    // Ensure music is triggered and unmuted when curtain lifts
+    if (bgAudio && !userExplicitlyPaused) {
+      bgAudio.muted = false;
+      bgAudio.volume = 0.65;
+      bgAudio.play().then(() => updateAudioUI(true)).catch(() => {});
+    }
     setTimeout(startAuto, AUTO.DELAY);
   }, 420);
 }
@@ -458,7 +462,8 @@ let userExplicitlyPaused = false;
 
 function updateAudioUI(isPlaying) {
   if (!audioToggleBtn) return;
-  if (isPlaying) {
+  const actuallyOff = userExplicitlyPaused && !isPlaying;
+  if (!actuallyOff) {
     audioToggleBtn.classList.add("is-playing");
     if (audioBars) audioBars.style.display = "flex";
     if (audioIconMuted) audioIconMuted.style.display = "none";
@@ -485,12 +490,12 @@ function startAudioPlayback() {
       })
       .catch((err) => {
         // Fall back to muted stream so audio timeline runs from load,
-        // and un-mutes to full volume on first visitor touch/click
+        // and un-mutes to full volume on first visitor touch/click/scroll
         bgAudio.muted = true;
         bgAudio.play().then(() => {
           updateAudioUI(true);
         }).catch(() => {
-          updateAudioUI(false);
+          updateAudioUI(true);
         });
         throw err;
       });
@@ -510,8 +515,12 @@ if (bgAudio && audioToggleBtn) {
   // Sync UI automatically on audio element state changes
   bgAudio.addEventListener("playing", () => updateAudioUI(true));
   bgAudio.addEventListener("play", () => updateAudioUI(true));
-  bgAudio.addEventListener("pause", () => updateAudioUI(false));
-  bgAudio.addEventListener("ended", () => updateAudioUI(false));
+  bgAudio.addEventListener("pause", () => {
+    if (userExplicitlyPaused) updateAudioUI(false);
+  });
+  bgAudio.addEventListener("ended", () => {
+    if (userExplicitlyPaused) updateAudioUI(false);
+  });
 
   // Toggle button click: toggle playback directly without any race condition
   const handleToggle = (e) => {
@@ -533,19 +542,30 @@ if (bgAudio && audioToggleBtn) {
   audioToggleBtn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
 
   // First interaction gesture to unlock unmuted sound on modern mobile/desktop browsers
-  const gestureEvents = ["pointerdown", "click", "touchstart", "keydown"];
+  const gestureEvents = [
+    "pointerdown",
+    "click",
+    "touchstart",
+    "touchend",
+    "touchmove",
+    "scroll",
+    "wheel",
+    "keydown",
+  ];
   const handleFirstGesture = (e) => {
     if (e.target && e.target.closest && e.target.closest("#audioToggleBtn")) return;
     if (userExplicitlyPaused) return;
 
-    bgAudio.muted = false;
-    bgAudio.volume = 0.65;
-    bgAudio.play()
-      .then(() => {
-        updateAudioUI(true);
-        cleanupGestureListeners();
-      })
-      .catch(() => {});
+    if (bgAudio) {
+      bgAudio.muted = false;
+      bgAudio.volume = 0.65;
+      bgAudio.play()
+        .then(() => {
+          updateAudioUI(true);
+          cleanupGestureListeners();
+        })
+        .catch(() => {});
+    }
   };
 
   function cleanupGestureListeners() {
@@ -562,12 +582,12 @@ if (bgAudio && audioToggleBtn) {
 
   const loaderEl = document.getElementById("loader");
   if (loaderEl) {
-    ["click", "pointerdown", "touchstart"].forEach((evt) => {
+    ["click", "pointerdown", "touchstart", "touchend"].forEach((evt) => {
       loaderEl.addEventListener(evt, handleFirstGesture, { passive: true });
     });
   }
 
-  // Attempt initial playback immediately
+  // Attempt initial playback immediately with unmuted sound
   startAudioPlayback().catch(() => {});
   window.addEventListener("load", () => startAudioPlayback().catch(() => {}), { once: true });
   document.addEventListener("DOMContentLoaded", () => startAudioPlayback().catch(() => {}), { once: true });

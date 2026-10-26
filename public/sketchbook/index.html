@@ -335,10 +335,22 @@ const PAGES = [
 ];
 PAGES.forEach(p => p.url = DIR + p.file);
 
+// Pre-decode all images upfront so page turns never flash, drop frames, or glitch
+const cachedImgs = {};
+PAGES.forEach((p) => {
+  const im = new Image();
+  im.src = p.url;
+  if (im.decode) im.decode().catch(() => {});
+  cachedImgs[p.url] = im;
+});
+
 const M = PAGES.length;
 let idx = 0;
 let isBusy = false;
 let turn = null; // { dir, from, to, t }
+let lastTurnTime = 0;
+const TURN_COOLDOWN = 550; // ms: prevent double-clicks or multi-turn glitch
+let suppressClickUntil = 0;
 
 const stage = document.getElementById('sbStage');
 const sb3d = document.getElementById('sb3d');
@@ -363,11 +375,12 @@ function el(t, c) {
 }
 
 function imgEl(i, side) {
-  const im = new Image();
+  const cached = cachedImgs[PAGES[i].url];
+  const im = cached ? cached.cloneNode(true) : new Image();
   im.className = 'sb-half-img ' + side;
   im.draggable = false;
   im.alt = '';
-  im.src = PAGES[i].url;
+  if (!cached) im.src = PAGES[i].url;
   return im;
 }
 
@@ -443,7 +456,9 @@ function paint() {
   book.textContent = '';
   if (!turn) {
     const f = el('div', 'sb-full');
-    const im = new Image();
+    const cached = cachedImgs[PAGES[idx].url];
+    const im = cached ? cached.cloneNode(true) : new Image();
+    im.className = '';
     im.src = PAGES[idx].url;
     im.alt = PAGES[idx].title;
     im.draggable = false;
@@ -467,12 +482,14 @@ function paint() {
   a.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (performance.now() < suppressClickUntil) return;
     step('prev');
   });
 
   b.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (performance.now() < suppressClickUntil) return;
     step('next');
   });
 
@@ -511,7 +528,9 @@ function updateUI() {
 
 /* ---------------- turning engine (smooth cubic easing) ---------------- */
 function step(dir) {
-  if (isBusy || turn !== null) return;
+  const now = performance.now();
+  if (isBusy || turn !== null || (now - lastTurnTime < TURN_COOLDOWN)) return;
+  lastTurnTime = now;
   isBusy = true;
 
   const from = idx;
@@ -520,11 +539,11 @@ function step(dir) {
   paint();
   updateUI();
 
-  const dur = 450; // ms: fast, crisp, photorealistic bend
+  const dur = 420; // ms: fast, crisp, photorealistic bend
   const startTime = performance.now();
 
-  function anim(now) {
-    const elapsed = now - startTime;
+  function anim(currentTime) {
+    const elapsed = currentTime - startTime;
     const progress = Math.min(1, elapsed / dur);
     // Smoothstep cubic easing: 3p^2 - 2p^3
     const ease = progress * progress * (3 - 2 * progress);
@@ -540,7 +559,7 @@ function step(dir) {
       updateUI();
       setTimeout(() => {
         isBusy = false;
-      }, 50);
+      }, 150);
     }
   }
   requestAnimationFrame(anim);
@@ -561,7 +580,7 @@ function goTo(targetIdx) {
     updateUI();
     setTimeout(() => {
       isBusy = false;
-    }, 60);
+    }, 150);
   }
 }
 
@@ -569,12 +588,14 @@ function goTo(targetIdx) {
 btnLeft.addEventListener('click', (e) => {
   e.preventDefault();
   e.stopPropagation();
+  if (performance.now() < suppressClickUntil) return;
   step('prev');
 });
 
 btnRight.addEventListener('click', (e) => {
   e.preventDefault();
   e.stopPropagation();
+  if (performance.now() < suppressClickUntil) return;
   step('next');
 });
 
@@ -608,7 +629,7 @@ stage.addEventListener('touchmove', (e) => {
   const dy = e.touches[0].clientY - touchStartY;
 
   // Intercept ONLY when explicitly swiping horizontally; allow vertical page scroll!
-  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 14) {
+  if (Math.abs(dx) > Math.abs(dy) * 1.5 && Math.abs(dx) > 16) {
     isHorizSwipe = true;
     if (e.cancelable) e.preventDefault();
   }
@@ -618,25 +639,14 @@ stage.addEventListener('touchend', (e) => {
   if (e.changedTouches.length !== 1) return;
   const dx = e.changedTouches[0].clientX - touchStartX;
   const dy = e.changedTouches[0].clientY - touchStartY;
-  const dt = performance.now() - touchStartTime;
 
-  // 1. Horizontal swipe gesture
-  if (isHorizSwipe && Math.abs(dx) > 35) {
+  // 1. Horizontal swipe gesture ONLY
+  if (isHorizSwipe && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+    suppressClickUntil = performance.now() + 500;
     if (dx < 0) step('next');
     else step('prev');
-    return;
   }
-
-  // 2. Tap on left or right half
-  if (Math.abs(dx) < 15 && Math.abs(dy) < 15 && dt < 320) {
-    const r = book.getBoundingClientRect();
-    const cx = e.changedTouches[0].clientX;
-    const cy = e.changedTouches[0].clientY;
-    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
-      if (cx > r.left + r.width / 2) step('next');
-      else step('prev');
-    }
-  }
+  // Taps on the book or arrows are handled by native click listeners without duplicate firing!
 }, { passive: true });
 
 /* ---------------- desktop subtle 3D tilt ---------------- */

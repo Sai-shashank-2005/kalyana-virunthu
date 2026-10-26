@@ -56,6 +56,7 @@
       </div>
       <p class="loader-names">Santhosh Ananth <span>weds</span> Shunmugapriya</p>
       <p class="loader-msg" id="loaderMsg">Setting the scene</p>
+      <p class="loader-music-cue" id="loaderMusicCue">♫ Music Playing</p>
     </div>
   </div>
 
@@ -488,8 +489,14 @@
           var a = document.getElementById('bgAudio');
           if (a) {
             a.volume = 0.65;
+            a.muted = false;
             var p = a.play();
-            if (p !== undefined) p.catch(function(){});
+            if (p !== undefined) {
+              p.catch(function(){
+                a.muted = true;
+                a.play().catch(function(){});
+              });
+            }
           }
         } catch(e) {}
       })();
