@@ -495,8 +495,8 @@ let userExplicitlyPaused = false;
 
 function updateAudioUI(playing) {
   if (!audioToggleBtn) return;
-  isAudioPlaying = !!playing;
-  if (playing) {
+  const isOff = userExplicitlyPaused;
+  if (!isOff) {
     audioToggleBtn.classList.add("is-playing");
     if (audioBars) audioBars.style.display = "flex";
     if (audioIconMuted) audioIconMuted.style.display = "none";
@@ -504,7 +504,7 @@ function updateAudioUI(playing) {
     audioToggleBtn.setAttribute("aria-label", "Pause background music");
     audioToggleBtn.setAttribute("title", "Pause background music");
     const cueEl = document.getElementById("loaderMusicCue");
-    if (cueEl) cueEl.textContent = "♫ Music Playing";
+    if (cueEl) cueEl.textContent = "♫ Wedding Music Playing";
   } else {
     audioToggleBtn.classList.remove("is-playing");
     if (audioBars) audioBars.style.display = "none";
@@ -523,12 +523,17 @@ function startAudioPlayback() {
   if (promise !== undefined) {
     return promise
       .then(() => {
+        isAudioPlaying = true;
         updateAudioUI(true);
         return true;
       })
       .catch(() => {
-        // Autoplay blocked by browser policy without prior user gesture
-        updateAudioUI(false);
+        // Fall back to active muted playback so audio timeline runs from load,
+        // and unmutes to full volume on first visitor touch/click/scroll
+        bgAudio.muted = true;
+        bgAudio.play().then(() => {
+          updateAudioUI(true);
+        }).catch(() => {});
         return false;
       });
   }
@@ -546,16 +551,16 @@ function pauseAudioPlayback() {
 if (bgAudio && audioToggleBtn) {
   // Sync UI automatically on audio element state changes
   bgAudio.addEventListener("playing", () => {
-    if (!bgAudio.muted) updateAudioUI(true);
+    if (!userExplicitlyPaused) updateAudioUI(true);
   });
   bgAudio.addEventListener("play", () => {
-    if (!bgAudio.muted) updateAudioUI(true);
+    if (!userExplicitlyPaused) updateAudioUI(true);
   });
   bgAudio.addEventListener("pause", () => {
-    updateAudioUI(false);
+    if (userExplicitlyPaused) updateAudioUI(false);
   });
   bgAudio.addEventListener("ended", () => {
-    updateAudioUI(false);
+    if (userExplicitlyPaused) updateAudioUI(false);
   });
 
   // Toggle button click: toggle playback directly without any race condition
@@ -567,7 +572,12 @@ if (bgAudio && audioToggleBtn) {
       pauseAudioPlayback();
     } else {
       userExplicitlyPaused = false;
-      startAudioPlayback();
+      bgAudio.muted = false;
+      bgAudio.volume = 0.65;
+      bgAudio.play().then(() => {
+        isAudioPlaying = true;
+        updateAudioUI(true);
+      }).catch(() => {});
     }
   };
 
@@ -581,18 +591,23 @@ if (bgAudio && audioToggleBtn) {
     "click",
     "touchstart",
     "touchend",
+    "touchmove",
+    "scroll",
+    "wheel",
     "keydown",
   ];
   const handleFirstGesture = (e) => {
     if (e.target && e.target.closest && e.target.closest("#audioToggleBtn")) return;
     if (userExplicitlyPaused) return;
 
-    if (!isAudioPlaying) {
-      startAudioPlayback().then((started) => {
-        if (started) {
-          cleanupGestureListeners();
-        }
-      });
+    if (bgAudio) {
+      bgAudio.muted = false;
+      bgAudio.volume = 0.65;
+      bgAudio.play().then(() => {
+        isAudioPlaying = true;
+        updateAudioUI(true);
+        cleanupGestureListeners();
+      }).catch(() => {});
     }
   };
 
