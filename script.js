@@ -388,7 +388,7 @@ function finish() {
       setTimeout(() => loader && loader.remove(), 800);
     }
     // Ensure music is triggered when curtain lifts
-    if (typeof playAudio === "function") playAudio();
+    startAudioPlayback();
     setTimeout(startAuto, AUTO.DELAY);
   }, 420);
 }
@@ -445,7 +445,7 @@ function initScrollReveals() {
 }
 
 /* ============================================================
-   BACKGROUND MUSIC CONTROLLER (BULLETPROOF TOGGLE & AUTOPLAY)
+   BACKGROUND MUSIC CONTROLLER (DEFAULT AUTOPLAY & TOGGLE)
    ============================================================ */
 
 const bgAudio = document.getElementById("bgAudio");
@@ -455,7 +455,6 @@ const audioIconMuted = document.getElementById("audioIconMuted");
 const audioLabel = document.getElementById("audioLabel");
 
 let userExplicitlyPaused = false;
-let fadeTimer = null;
 
 function updateAudioUI(isPlaying) {
   if (!audioToggleBtn) return;
@@ -474,57 +473,35 @@ function updateAudioUI(isPlaying) {
   }
 }
 
-function fadeIn(targetVolume = 0.55, duration = 1200) {
-  if (!bgAudio) return;
-  if (fadeTimer) clearInterval(fadeTimer);
-  const stepTime = 50;
-  const steps = duration / stepTime;
-  const startVol = bgAudio.volume;
-  const volStep = (targetVolume - startVol) / steps;
-  let currentStep = 0;
-
-  fadeTimer = setInterval(() => {
-    currentStep++;
-    const nextVol = Math.min(targetVolume, Math.max(0, startVol + volStep * currentStep));
-    bgAudio.volume = nextVol;
-    if (currentStep >= steps || nextVol >= targetVolume) {
-      bgAudio.volume = targetVolume;
-      clearInterval(fadeTimer);
-      fadeTimer = null;
-    }
-  }, stepTime);
-}
-
-function startAudioPlayback(withFade = true) {
+function startAudioPlayback() {
   if (!bgAudio || userExplicitlyPaused) return Promise.resolve();
   bgAudio.muted = false;
-  if (withFade) {
-    bgAudio.volume = 0;
-  } else {
-    bgAudio.volume = 0.55;
-  }
+  bgAudio.volume = 0.65;
   const promise = bgAudio.play();
   if (promise !== undefined) {
     return promise
       .then(() => {
         updateAudioUI(true);
-        if (withFade) fadeIn(0.55);
       })
       .catch((err) => {
-        // Autoplay blocked without user gesture
-        updateAudioUI(false);
+        // Fall back to muted stream so audio timeline runs from load,
+        // and un-mutes to full volume on first visitor touch/click
+        bgAudio.muted = true;
+        bgAudio.play().then(() => {
+          updateAudioUI(true);
+        }).catch(() => {
+          updateAudioUI(false);
+        });
         throw err;
       });
   }
   return Promise.resolve();
 }
 
+const playAudio = startAudioPlayback;
+
 function pauseAudioPlayback() {
   if (!bgAudio) return;
-  if (fadeTimer) {
-    clearInterval(fadeTimer);
-    fadeTimer = null;
-  }
   bgAudio.pause();
   updateAudioUI(false);
 }
@@ -532,6 +509,7 @@ function pauseAudioPlayback() {
 if (bgAudio && audioToggleBtn) {
   // Sync UI automatically on audio element state changes
   bgAudio.addEventListener("playing", () => updateAudioUI(true));
+  bgAudio.addEventListener("play", () => updateAudioUI(true));
   bgAudio.addEventListener("pause", () => updateAudioUI(false));
   bgAudio.addEventListener("ended", () => updateAudioUI(false));
 
@@ -544,7 +522,9 @@ if (bgAudio && audioToggleBtn) {
       pauseAudioPlayback();
     } else {
       userExplicitlyPaused = false;
-      startAudioPlayback(false);
+      bgAudio.muted = false;
+      bgAudio.volume = 0.65;
+      bgAudio.play().then(() => updateAudioUI(true)).catch(() => {});
     }
   };
 
@@ -552,14 +532,17 @@ if (bgAudio && audioToggleBtn) {
   audioToggleBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
   audioToggleBtn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
 
-  // First interaction gesture to unlock audio on modern browsers
+  // First interaction gesture to unlock unmuted sound on modern mobile/desktop browsers
   const gestureEvents = ["pointerdown", "click", "touchstart", "keydown"];
   const handleFirstGesture = (e) => {
     if (e.target && e.target.closest && e.target.closest("#audioToggleBtn")) return;
     if (userExplicitlyPaused) return;
 
-    startAudioPlayback(true)
+    bgAudio.muted = false;
+    bgAudio.volume = 0.65;
+    bgAudio.play()
       .then(() => {
+        updateAudioUI(true);
         cleanupGestureListeners();
       })
       .catch(() => {});
@@ -577,10 +560,17 @@ if (bgAudio && audioToggleBtn) {
     document.addEventListener(evt, handleFirstGesture, { passive: true });
   });
 
-  // Attempt initial autoplay on load
-  startAudioPlayback(true).catch(() => {
-    updateAudioUI(false);
-  });
+  const loaderEl = document.getElementById("loader");
+  if (loaderEl) {
+    ["click", "pointerdown", "touchstart"].forEach((evt) => {
+      loaderEl.addEventListener(evt, handleFirstGesture, { passive: true });
+    });
+  }
+
+  // Attempt initial playback immediately
+  startAudioPlayback().catch(() => {});
+  window.addEventListener("load", () => startAudioPlayback().catch(() => {}), { once: true });
+  document.addEventListener("DOMContentLoaded", () => startAudioPlayback().catch(() => {}), { once: true });
 }
 
 /* ---------- init execution ---------- */
