@@ -495,8 +495,9 @@ let userExplicitlyPaused = false;
 
 function updateAudioUI(playing) {
   if (!audioToggleBtn) return;
-  const isOff = userExplicitlyPaused;
-  if (!isOff) {
+  isAudioPlaying = !!playing;
+  if (playing && bgAudio && !bgAudio.muted) {
+    audioToggleBtn.classList.remove("is-prompt");
     audioToggleBtn.classList.add("is-playing");
     if (audioBars) audioBars.style.display = "flex";
     if (audioIconMuted) audioIconMuted.style.display = "none";
@@ -504,12 +505,22 @@ function updateAudioUI(playing) {
     audioToggleBtn.setAttribute("aria-label", "Pause background music");
     audioToggleBtn.setAttribute("title", "Pause background music");
     const cueEl = document.getElementById("loaderMusicCue");
-    if (cueEl) cueEl.textContent = "♫ Wedding Music Playing";
-  } else {
+    if (cueEl) cueEl.textContent = "♫ Music Playing";
+  } else if (userExplicitlyPaused) {
+    audioToggleBtn.classList.remove("is-prompt");
     audioToggleBtn.classList.remove("is-playing");
     if (audioBars) audioBars.style.display = "none";
     if (audioIconMuted) audioIconMuted.style.display = "block";
     if (audioLabel) audioLabel.textContent = "Music Off";
+    audioToggleBtn.setAttribute("aria-label", "Play background music");
+    audioToggleBtn.setAttribute("title", "Play background music");
+  } else {
+    // Waiting for initial user touch/gesture to unmute sound
+    audioToggleBtn.classList.add("is-prompt");
+    audioToggleBtn.classList.remove("is-playing");
+    if (audioBars) audioBars.style.display = "none";
+    if (audioIconMuted) audioIconMuted.style.display = "block";
+    if (audioLabel) audioLabel.textContent = "Tap for Music";
     audioToggleBtn.setAttribute("aria-label", "Play background music");
     audioToggleBtn.setAttribute("title", "Play background music");
   }
@@ -528,12 +539,8 @@ function startAudioPlayback() {
         return true;
       })
       .catch(() => {
-        // Fall back to active muted playback so audio timeline runs from load,
-        // and unmutes to full volume on first visitor touch/click/scroll
-        bgAudio.muted = true;
-        bgAudio.play().then(() => {
-          updateAudioUI(true);
-        }).catch(() => {});
+        // Blocked by browser without prior user gesture
+        updateAudioUI(false);
         return false;
       });
   }
@@ -551,16 +558,16 @@ function pauseAudioPlayback() {
 if (bgAudio && audioToggleBtn) {
   // Sync UI automatically on audio element state changes
   bgAudio.addEventListener("playing", () => {
-    if (!userExplicitlyPaused) updateAudioUI(true);
+    if (!bgAudio.muted) updateAudioUI(true);
   });
   bgAudio.addEventListener("play", () => {
-    if (!userExplicitlyPaused) updateAudioUI(true);
+    if (!bgAudio.muted) updateAudioUI(true);
   });
   bgAudio.addEventListener("pause", () => {
-    if (userExplicitlyPaused) updateAudioUI(false);
+    updateAudioUI(false);
   });
   bgAudio.addEventListener("ended", () => {
-    if (userExplicitlyPaused) updateAudioUI(false);
+    updateAudioUI(false);
   });
 
   // Toggle button click: toggle playback directly without any race condition
@@ -591,9 +598,6 @@ if (bgAudio && audioToggleBtn) {
     "click",
     "touchstart",
     "touchend",
-    "touchmove",
-    "scroll",
-    "wheel",
     "keydown",
   ];
   const handleFirstGesture = (e) => {

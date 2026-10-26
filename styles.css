@@ -1283,6 +1283,22 @@ body:not(.decorative-ready) .all-text { opacity: 0 !important; }
   transform: translateY(0) scale(0.98);
 }
 
+.audio-toggle-btn.is-prompt {
+  border-color: rgba(223, 191, 136, 0.9);
+  animation: audioPromptPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes audioPromptPulse {
+  0%, 100% {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(176, 141, 87, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(223, 191, 136, 0.65);
+    transform: scale(1.04);
+  }
+}
+
 /* Animated Equalizer Bars */
 .audio-bars {
   display: flex;
