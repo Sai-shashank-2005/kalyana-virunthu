@@ -42,14 +42,6 @@ body {
   color: var(--color-deep-olive);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
-  overscroll-behavior-y: none;   /* stops iOS rubber-banding out of the lock */
-}
-
-body.locked {
-  overflow: hidden;
-  height: 100svh;
-  position: fixed;               /* hard lock for mobile Safari */
-  width: 100%;
 }
 
 /* ---------- LOADING SCREEN ----------
@@ -150,19 +142,28 @@ body.locked {
 
 .loader-msg.is-swapping { opacity: 0; }
 
-/* ---------- HERO ---------- */
+/* ---------- HERO SCROLL TRACK ---------- */
+
+.hero-scroll-track {
+  position: relative;
+  height: 220vh; /* Smooth, natural scroll budget */
+  background: #141414;
+}
 
 .hero {
-  position: relative;
+  position: sticky;
+  top: 0;
   /* svh keeps mobile browser chrome from clipping the composition */
   height: 100svh;
   min-height: 100svh;
+  width: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;   /* text blocks are gone; centre the hands */
   align-items: center;
   overflow: hidden;
   background: radial-gradient(circle at 50% 30%, #4a4a4a 0%, #2b2b2b 45%, #141414 100%);
+  z-index: 5;
 }
 
 /* LAYER 1 — bbg (2814x1583, ratio ~1.777) */
@@ -1210,5 +1211,112 @@ body:not(.decorative-ready) .all-text { opacity: 0 !important; }
   .reveal {
     opacity: 1 !important;
     transform: none !important;
+  }
+}
+
+/* ============================================================
+   FLOATING WEDDING MUSIC PLAYER
+   ============================================================ */
+
+.audio-player {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+}
+
+.audio-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 16px 0 14px;
+  border-radius: 999px;
+  background: rgba(46, 14, 18, 0.92);
+  border: 1px solid rgba(176, 141, 87, 0.65);
+  color: #F8F5EE;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(223, 191, 136, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.audio-toggle-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  background: rgba(68, 20, 25, 0.96);
+  border-color: #B08D57;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), 0 0 12px rgba(176, 141, 87, 0.35);
+}
+
+.audio-toggle-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Animated Equalizer Bars */
+.audio-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+  width: 17px;
+}
+
+.audio-bars .bar {
+  width: 2px;
+  background-color: #dfbf88;
+  border-radius: 2px;
+  height: 4px;
+  transition: height 0.2s ease;
+}
+
+.audio-toggle-btn.is-playing .bar-1 {
+  animation: eqBounce 1s ease-in-out infinite alternate;
+}
+.audio-toggle-btn.is-playing .bar-2 {
+  animation: eqBounce 0.8s ease-in-out infinite alternate 0.2s;
+}
+.audio-toggle-btn.is-playing .bar-3 {
+  animation: eqBounce 1.2s ease-in-out infinite alternate 0.4s;
+}
+.audio-toggle-btn.is-playing .bar-4 {
+  animation: eqBounce 0.9s ease-in-out infinite alternate 0.1s;
+}
+
+@keyframes eqBounce {
+  0% { height: 3px; }
+  50% { height: 16px; }
+  100% { height: 6px; }
+}
+
+.audio-icon-muted {
+  width: 18px;
+  height: 18px;
+  color: #dfbf88;
+}
+
+.audio-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.76rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #fcf9f2;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .audio-player {
+    bottom: 16px;
+    right: 16px;
+  }
+  .audio-toggle-btn {
+    height: 40px;
+    padding: 0 12px 0 10px;
+  }
+  .audio-label {
+    font-size: 0.7rem;
+    letter-spacing: 1px;
   }
 }
